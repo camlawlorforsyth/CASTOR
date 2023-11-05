@@ -1,0 +1,191 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<skirt-simulation-hierarchy type="MonteCarloSimulation" format="9" producer="SKIRT v9.0 (git 0 built on 22/04/2023 at 09:15:11)" time="2023-05-01T00:13:06.003">
+    <MonteCarloSimulation userLevel="Regular" simulationMode="DustEmission" iteratePrimaryEmission="false" iterateSecondaryEmission="false" numPackets="100000000">
+        <random type="Random">
+            <Random seed="0" />
+        </random>
+        <units type="Units">
+            <ExtragalacticUnits wavelengthOutputStyle="Wavelength" fluxOutputStyle="Frequency" />
+        </units>
+        <cosmology type="Cosmology">
+            <FlatUniverseCosmology redshift="0.0" reducedHubbleConstant="0.6774" matterDensityFraction="0.3089" />
+        </cosmology>
+        <sourceSystem type="SourceSystem">
+            <SourceSystem minWavelength="0.09 micron" maxWavelength="100 micron" wavelengths="0.55 micron" sourceBias="0.5">
+                <sources type="Source">
+                    <ParticleSource filename="oldstars.txt" importVelocity="false" importVelocityDispersion="false" importCurrentMass="false" useColumns="" sourceWeight="1" wavelengthBias="0.5">
+                        <smoothingKernel type="SmoothingKernel">
+                            <CubicSplineSmoothingKernel />
+                        </smoothingKernel>
+                        <sedFamily type="SEDFamily">
+                            <BruzualCharlotSEDFamily imf="Chabrier" resolution="Low" />
+                        </sedFamily>
+                        <wavelengthBiasDistribution type="WavelengthDistribution">
+                            <LogWavelengthDistribution minWavelength="1e-6 micron" maxWavelength="1e6 micron" />
+                        </wavelengthBiasDistribution>
+                    </ParticleSource>
+					<ParticleSource filename="youngstars.txt" importVelocity="false" importVelocityDispersion="false" importCurrentMass="false" useColumns="" sourceWeight="1" wavelengthBias="0.5">
+						<smoothingKernel type="SmoothingKernel">
+							<CubicSplineSmoothingKernel />
+						</smoothingKernel>
+						<sedFamily type="SEDFamily">
+							<MappingsSEDFamily />
+						</sedFamily>
+						<wavelengthBiasDistribution type="WavelengthDistribution">
+							<LogWavelengthDistribution minWavelength="1e-6 micron" maxWavelength="1e6 micron" />
+						</wavelengthBiasDistribution>
+					</ParticleSource>
+                </sources>
+            </SourceSystem>
+        </sourceSystem>
+        <mediumSystem type="MediumSystem">
+            <MediumSystem>
+                <photonPacketOptions type="PhotonPacketOptions">
+                    <PhotonPacketOptions explicitAbsorption="false" forceScattering="true" minWeightReduction="1e4" minScattEvents="0" pathLengthBias="0.5" />
+                </photonPacketOptions>
+                <radiationFieldOptions type="RadiationFieldOptions">
+                    <RadiationFieldOptions storeRadiationField="true">
+                        <radiationFieldWLG type="DisjointWavelengthGrid">
+                            <LogWavelengthGrid minWavelength="0.09 micron" maxWavelength="20 micron" numWavelengths="50" />
+                        </radiationFieldWLG>
+                    </RadiationFieldOptions>
+                </radiationFieldOptions>
+                <secondaryEmissionOptions type="SecondaryEmissionOptions">
+                    <SecondaryEmissionOptions storeEmissionRadiationField="false" secondaryPacketsMultiplier="1" spatialBias="0.5" sourceBias="0.5" />
+                </secondaryEmissionOptions>
+                <dustEmissionOptions type="DustEmissionOptions">
+                    <DustEmissionOptions dustEmissionType="Stochastic" includeHeatingByCMB="false" maxFractionOfPrimary="0.01" maxFractionOfPrevious="0.03" sourceWeight="1" wavelengthBias="0.5">
+                        <cellLibrary type="SpatialCellLibrary">
+                            <AllCellsLibrary />
+                        </cellLibrary>
+                        <dustEmissionWLG type="DisjointWavelengthGrid">
+                            <NestedLogWavelengthGrid minWavelengthBaseGrid="0.09 micron" maxWavelengthBaseGrid="1000 micron" numWavelengthsBaseGrid="100" minWavelengthSubGrid="3 micron" maxWavelengthSubGrid="30 micron" numWavelengthsSubGrid="100" />
+                        </dustEmissionWLG>
+                        <wavelengthBiasDistribution type="WavelengthDistribution">
+                            <LogWavelengthDistribution minWavelength="1e-6 micron" maxWavelength="1e6 micron" />
+                        </wavelengthBiasDistribution>
+                    </DustEmissionOptions>
+                </dustEmissionOptions>
+                <media type="Medium">
+                    <VoronoiMeshMedium filename="gas.txt" minX="minX" maxX="maxX" minY="minY" maxY="maxY" minZ="minZ" maxZ="maxZ" massType="Mass" massFraction="fdust" importMetallicity="true" importTemperature="false" maxTemperature="0 K" importVelocity="false" importMagneticField="false" importVariableMixParams="false" useColumns="">
+                        <materialMix type="MaterialMix">
+                            <ThemisDustMix numSilicateSizes="15" numHydrocarbonSizes="15" />
+                        </materialMix>
+                    </VoronoiMeshMedium>
+                </media>
+                <samplingOptions type="SamplingOptions">
+                    <SamplingOptions numDensitySamples="200" numPropertySamples="1" aggregateVelocity="Average" />
+                </samplingOptions>
+                <grid type="SpatialGrid">
+                    <PolicyTreeSpatialGrid minX="minX" maxX="maxX" minY="minY" maxY="maxY" minZ="minZ" maxZ="maxZ" treeType="OctTree">
+                        <policy type="TreePolicy">
+                            <DensityTreePolicy minLevel="6" maxLevel="12" maxDustFraction="1e-6" maxDustOpticalDepth="0" wavelength="0.55 micron" maxDustDensityDispersion="0" maxElectronFraction="1e-6" maxGasFraction="1e-6" />
+                        </policy>
+                    </PolicyTreeSpatialGrid>
+                </grid>
+            </MediumSystem>
+        </mediumSystem>
+        <instrumentSystem type="InstrumentSystem">
+            <InstrumentSystem>
+                <defaultWavelengthGrid type="WavelengthGrid">
+                    <LogWavelengthGrid minWavelength="0.09 micron" maxWavelength="1000 micron" numWavelengths="1000" />
+                </defaultWavelengthGrid>
+                <instruments type="Instrument">
+                    <FrameInstrument instrumentName="CASTOR" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="CASTOR_UV" />
+									<BroadBand bandName="CASTOR_U" />
+                                    <BroadBand bandName="CASTOR_G" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="HST" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="HST_F218W" />
+									<BroadBand bandName="HST_F225W" />
+									<BroadBand bandName="HST_F275W" />
+									<BroadBand bandName="HST_F336W" />
+									<BroadBand bandName="HST_F390W" />
+									<BroadBand bandName="HST_F438W" />
+                                    <BroadBand bandName="HST_F435W" />
+									<BroadBand bandName="HST_F475W" />
+									<BroadBand bandName="HST_F555W" />
+									<BroadBand bandName="HST_F606W" />
+									<BroadBand bandName="HST_F625W" />
+									<BroadBand bandName="HST_F775W" />
+									<BroadBand bandName="HST_F814W" />
+									<BroadBand bandName="HST_F850LP" />
+									<BroadBand bandName="HST_F105W" />
+									<BroadBand bandName="HST_F110W" />
+									<BroadBand bandName="HST_F125W" />
+									<BroadBand bandName="HST_F140W" />
+									<BroadBand bandName="HST_F160W" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="JWST" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName=" JWST_F070W" />
+									<BroadBand bandName=" JWST_F090W" />
+									<BroadBand bandName=" JWST_F115W" />
+									<BroadBand bandName=" JWST_F150W" />
+									<BroadBand bandName=" JWST_F200W" />
+									<BroadBand bandName=" JWST_F277W" />
+									<BroadBand bandName=" JWST_F356W" />
+									<BroadBand bandName=" JWST_F410M" />
+									<BroadBand bandName=" JWST_F444W" />
+									<BroadBand bandName=" JWST_F560W" />
+									<BroadBand bandName=" JWST_F770W" />
+									<BroadBand bandName=" JWST_F1000W" />
+									<BroadBand bandName=" JWST_F1130W" />
+									<BroadBand bandName=" JWST_F1280W" />
+									<BroadBand bandName=" JWST_F1500W" />
+									<BroadBand bandName=" JWST_F1800W" />
+									<BroadBand bandName=" JWST_F2100W" />
+									<BroadBand bandName=" JWST_F2550W" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Roman" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="ROMAN_F062" />
+									<BroadBand bandName="ROMAN_F087" />
+									<BroadBand bandName="ROMAN_F106" />
+									<BroadBand bandName="ROMAN_F129" />
+									<BroadBand bandName="ROMAN_F146" />
+									<BroadBand bandName="ROMAN_F158" />
+									<BroadBand bandName="ROMAN_F184" />
+									<BroadBand bandName="ROMAN_F213" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+                </instruments>
+            </InstrumentSystem>
+        </instrumentSystem>
+        <probeSystem type="ProbeSystem">
+            <ProbeSystem>
+                <probes type="Probe">
+                    <ConvergenceInfoProbe probeName="cnv" wavelength="0.55 micron" probeAfter="Setup" />
+                    <ConvergenceCutsProbe probeName="dns" probeAfter="Setup" />
+                    <TemperatureProbe probeName="tmp" aggregation="Type" probeAfter="Run">
+                        <form type="Form">
+                            <DefaultCutsForm />
+                        </form>
+                    </TemperatureProbe>
+                </probes>
+            </ProbeSystem>
+        </probeSystem>
+    </MonteCarloSimulation>
+</skirt-simulation-hierarchy>
