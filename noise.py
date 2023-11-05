@@ -17,8 +17,8 @@ import plotting as plt
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
-def add_noise_and_psf(subID, telescope, version='', psf=0.15*u.arcsec,
-                      display=False, save=True) :
+def add_noise_and_psf(subID, telescope, population='quenched',
+                      psf=0.15*u.arcsec, display=False, save=True) :
     
     # telescope diameters from
     # https://www.castormission.org/mission
@@ -28,8 +28,8 @@ def add_noise_and_psf(subID, telescope, version='', psf=0.15*u.arcsec,
     # https://roman.ipac.caltech.edu/sims/Param_db.html
     
     inDir = 'SKIRT/SKIRT_output_quenched/'
-    outDir = 'SKIRT/SKIRT_processed_images_quenched/{}/'.format(subID)
-    passbandsDir = 'passbands/'
+    outDir = 'cutouts/{}/{}/'.format(population, subID)
+    passbandsDir = 'passbands/passbands_micron/'
     
     # open the SKIRT output file, and get the plate scale for the SKIRT images
     infile = '{}{}/{}_{}_total.fits'.format(inDir, subID, subID,
@@ -185,18 +185,20 @@ def add_noise_and_psf(subID, telescope, version='', psf=0.15*u.arcsec,
         if save :
             os.makedirs(outDir, exist_ok=True)
             
-            outfile = '{}_{}.fits'.format(telescope, filt.split('_')[1])
-            save_cutout(subtracted.value, outDir + outfile,
-                        exposure.value, photfnu.value, plate_scale.value, 0.5)
+            # outfile = '{}_{}.fits'.format(filt, telescope.split('_')[1])
+            # save_cutout(subtracted.value, outDir + outfile,
+            #             exposure.value, photfnu.value, plate_scale.value, 0.5)
             
-            noise_outfile = '{}_{}_noise.fits'.format(telescope, filt.split('_')[1])
-            save_cutout(noise.value, outDir + noise_outfile,
-                        exposure.value, photfnu.value, plate_scale.value, 0.5)
+            # noise_outfile = '{}_{}_noise.fits'.format(filt, telescope.split('_')[1])
+            # save_cutout(noise.value, outDir + noise_outfile,
+            #             exposure.value, photfnu.value, plate_scale.value, 0.5)
             
-            snr_outfile = '{}_{}_snr.png'.format(telescope, filt.split('_')[1])
+            os.makedirs(outDir + '/snr_maps/', exist_ok=True)
+            snr_outfile = '{}_{}_snr.png'.format(filt, telescope.split('_')[1])
             plt.display_image_simple(subtracted.value/noise.value,
                 lognorm=False, vmin=0.5, vmax=10, save=True,
-                outfile=outDir + snr_outfile)
+                outfile=outDir + '/snr_maps/' + snr_outfile)
+            
     
     return
 
@@ -535,7 +537,7 @@ def flam_to_mag(waves, flam, response) :
     
     return -2.5*np.log10(fnu) - 48.6
 
-def get_noise() :
+def get_noise(pretty_print=False) :
     
     infile = 'noise/noise_components.txt'
     
@@ -545,6 +547,10 @@ def get_noise() :
     else :
         with open(infile, 'wb') as file :
             pickle.dump(determine_noise_components(), file)
+    
+    # if pretty_print :
+    #     import pprint
+    #     pprint.pprint(dictionary)
     
     return dictionary
 
@@ -593,6 +599,20 @@ def mag_to_Jy(mag) :
     mag = mag.to(u.mag/np.square(u.arcsec))
     return np.power(10, -0.4*(mag.value - 8.9))*u.Jy/np.square(u.arcsec)
 
+def process_everything(population='quenched') :
+    
+    inDir = 'SKIRT/SKIRT_output_{}/'.format(population)
+    subIDs = np.sort(np.int_(os.listdir(inDir)))
+    
+    for subID in subIDs :
+        if subID != 14 :
+            add_noise_and_psf(subID, 'castor_ultradeep')
+            add_noise_and_psf(subID, 'roman_hlwas')
+            # add_noise_and_psf(subID, 'hst_deep')
+            # add_noise_and_psf(subID, 'jwst_deep')
+    
+    return
+
 def save_cutout(data, outfile, exposure, photfnu, scale, redshift) :
     
     hdu = fits.PrimaryHDU(data)
@@ -613,44 +633,6 @@ def save_cutout(data, outfile, exposure, photfnu, scale, redshift) :
     
     return
 
-# import pprint
-# pprint.pprint(get_noise())
-
-# inDir = 'SKIRT/subID_198186/snap_51_variousRedshifts_allBC03/'
-# inDir = 'SKIRT/subID_198186/snap_51_variousRedshifts_allBC03_revisedAges/'
-
-# add_noise_and_psf(inDir, 'castor_wide', 'TNG_v0.7')
-# add_noise_and_psf(inDir, 'castor_deep', 'TNG_v0.7')
-# add_noise_and_psf(inDir, 'castor_ultradeep', 'TNG_v0.7')
-# add_noise_and_psf(inDir, 'hst_hff', psf=0.14729817*u.arcsec) # PSF for F160W
-# add_noise_and_psf(inDir, 'hst_deep', psf=0.14729817*u.arcsec) # PSF for F160W
-# add_noise_and_psf(inDir, 'jwst_deep', psf=0.145026*u.arcsec) # PSF for NIRCam
-# add_noise_and_psf(inDir, 'roman_hlwas', psf=0.151*u.arcsec) # PSF for F184 in HLWAS
-
-# inDir = 'SKIRT/subID_198186/snap_51_variousRedshifts_MAPPINGSIII_revisedAges/'
-# add_noise_and_psf(inDir, telescope='castor_wide', version='TNG_v0.8')
-
-# inDir = 'SKIRT/subID_198186/snap_51_variousRedshifts_allBC03_revisedAges_onlyOldTest/'
-# add_noise_and_psf(inDir, telescope='roman', version='v0.7_1e6photons')
-
-# inDir = 'SKIRT/198186'
-# add_noise_and_psf(inDir + '_particle_BC03/', 'castor_wide', version='198186')
-# add_noise_and_psf(inDir + '_particle_MAPPINGS/', 'castor_wide', version='198186')
-# add_noise_and_psf(inDir + '_voronoi_MAPPINGS/', 'castor_wide', version='198186')
-
-# add_noise_and_psf(63871, 'castor_wide')
-# add_noise_and_psf(63871, 'castor_deep')
-# add_noise_and_psf(63871, 'castor_ultradeep')
-# add_noise_and_psf(63871, 'roman_hlwas')
-
-# add_noise_and_psf(198186, 'castor_ultradeep')
-# add_noise_and_psf(198186, 'roman_hlwas')
-
+# 96771, 63871, 198186
 # add_noise_and_psf(96771, 'castor_ultradeep')
 # add_noise_and_psf(96771, 'roman_hlwas')
-
-# subIDs = os.listdir('SKIRT/SKIRT_output_quenched')
-# for subID in subIDs :
-#     if subID != '14' :
-#         add_noise_and_psf(subID, 'castor_ultradeep')
-#         add_noise_and_psf(subID, 'roman_hlwas')

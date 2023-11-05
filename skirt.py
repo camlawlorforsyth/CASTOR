@@ -467,6 +467,3 @@ def save_skirt_input(subIDfinal, snap, subID, Re, center, gas_setup='voronoi',
     print('{} done'.format(subIDfinal))
     
     return
-
-# from os import listdir, mkdir
-# subIDs = list(np.sort(np.int_(listdir('SKIRT/SKIRT_input_quenched'))))
