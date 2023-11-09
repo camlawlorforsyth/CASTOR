@@ -1,98 +1,221 @@
 
-# import os
 import numpy as np
 
-from astropy.io import fits
+from astropy.cosmology import FlatLambdaCDM, z_at_value
 from astropy.table import Table
 import astropy.units as u
+import h5py
 
 import plotting as plt
 
-def prepare_photometry_for_fitting() :
+cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
+
+def compare_fast_output_to_tng(subID, snap, population='quenched', display=False) :
     
-    processedDir = 'SKIRT/SKIRT_processed_images_quenched/'
-    outDir = 'fastpp/'
-    # subIDs = os.listdir(processedDir)
+    # get galaxy attributes from TNG
+    time, mpbsubID, tngRe, center = load_galaxy_attributes(subID, snap)
     
-    # dims = []
-    # for subID in subIDs :
-    #     uv_infile = '{}{}/castor_ultradeep_uv.fits'.format(processedDir, subID)
-    #     with fits.open(uv_infile) as hdu :
-    #         processed_image = hdu[0].data # janskys [per pixel]
-    #         dim = processed_image.shape[0]
-    #         dims.append(dim)
-    # dims = [441, 316, 79, 100, 357, 172, 99, 126, 226, 108, 107, 218, 225, 73, 138,
-    #         198, 152, 161, 98, 153, 107, 90, 138, 126, 183, 87, 57, 366, 415, 88,
-    #         142, 63, 90, 101, 81, 137, 137, 219, 57, 132, 82, 236, 204, 300, 81,
-    #         336, 34, 311, 91, 131, 45, 61, 178, 131, 62, 291, 126, 267, 181, 107,
-    #         120, 179, 166, 178, 416, 152, 128, 121, 61, 80, 37, 172, 67, 55, 166,
-    #         82, 170, 100, 69, 96, 137, 222, 319, 233, 170, 174, 188, 242, 126, 255,
-    #         69, 63, 155, 237, 71, 116, 92, 229, 178, 260, 100, 150, 39, 196, 98,
-    #         283, 193, 66, 116, 62, 182, 265, 240, 187, 275, 108, 209, 130, 77, 438,
-    #         139, 238, 137, 253, 60, 123, 264, 162, 191, 58, 157, 73, 180, 87, 147,
-    #         341, 43, 226, 101, 59, 52, 54, 75, 368, 161, 67, 124, 55, 99, 251, 162,
-    #         162, 93, 172, 50, 68, 130, 193, 52, 97, 282, 212, 88, 56, 68, 171, 77,
-    #         57, 62, 140, 44, 131, 48, 139, 117, 188, 132, 65, 43, 271, 263, 69, 67,
-    #         86, 185, 105, 307, 46, 65, 69, 70, 41, 152, 75, 176, 107, 151, 66, 171,
-    #         263, 349, 324, 157, 58, 65, 278, 56, 140, 134, 349, 203, 412, 239, 436,
-    #         243, 241, 204, 111, 252, 213, 94, 249, 187, 293, 203, 83, 119, 171, 97,
-    #         275, 126, 64, 119, 88, 157, 238, 109, 242, 78, 55, 55, 293, 383, 336,
-    #         256, 208, 164, 235, 237, 191, 132, 119, 53, 88, 270, 109, 74, 191, 94,
-    #         129, 346, 471, 80, 149, 244, 187, 356, 76, 294, 247, 248, 269]
-    # num_pixs = np.square(np.array(dims)).astype(int)
-    # for subID, num_pix in zip(subIDs, num_pixs) :
-    #     print(subID, num_pix)
+    # get the annuli map, derived using SourceXtractor++ morphological values
+    bins_image, dim, numBins = load_annuli_map(population, subID)
     
-    subID = 96771
-    filters = ['castor_ultradeep_uv', 'castor_ultradeep_u', 'castor_ultradeep_g',
-               'roman_hlwas_f106', 'roman_hlwas_f129', 'roman_hlwas_f158', 'roman_hlwas_f184']
+    # get stellar mass and SFR maps direct from TNG, assuming 100 Myr for the
+    # duration of star formation
+    edges = np.linspace(-10*tngRe, 10*tngRe, dim + 1) # kpc
+    tng_Mstar_map, tng_SFR_map = spatial_plot_info(time, snap, mpbsubID,
+        center, tngRe, edges, 100*u.Myr)
+    tng_Mstar_map = np.rot90(tng_Mstar_map, k=3) # rotate images to match SKIRT
+    tng_SFR_map = np.rot90(tng_SFR_map, k=3)
     
-    # create empty array which will store all the photometry
-    data = np.full((2809, 16), np.nan)
+    if display :
+        plt.display_image_simple(tng_Mstar_map)
+        plt.display_image_simple(tng_SFR_map)
+        plt.display_image_simple(bins_image, lognorm=False)
     
-    # input id column which FAST++ requires
-    data[:, 0] = np.arange(2809)
+    # get the output from FAST++
+    lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi = load_fast_fits(subID)
     
-    for i, filt in enumerate(filters) :
+    # get basic information from the photometric table
+    nPixels, redshift, scale, rr, Re = load_photometric_information(population, subID)
+    
+    # determine the area of a single pixel, in arcsec^2
+    pixel_area = np.square(scale*u.pix)
+    
+    # determine the physical projected area of a single pixel
+    kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift).to(u.kpc/u.arcsec)
+    pixel_area_physical = np.square(kpc_per_arcsec)*pixel_area
+    
+    # determine the projected physical areas of every annulus
+    physical_area = pixel_area_physical*nPixels/u.pix
+    physical_area_pc2 = physical_area.to(np.square(u.pc))
+    
+    # convert the pixel values to physical sizes, mostly for plotting purposes
+    rr = rr*scale*kpc_per_arcsec # kpc
+    Re = Re*scale*kpc_per_arcsec # kpc
+    # rs = np.log10(rr/Re)
+    
+    # loop through the elliptical annuli, binning together valid pixels
+    tng_annuli_masses = np.full(numBins, 0.0)
+    tng_annuli_sfrs = np.full(numBins, 0.0)
+    for val in range(numBins) :
         
-        infile = '{}{}/{}.fits'.format(processedDir, subID, filt)
-        with fits.open(infile) as hdu :
-            processed_image = (hdu[0].data*u.Jy).to(u.uJy).value # microjanskys [per pixel]
-        data[:, 2*(i + 1) - 1] = processed_image.flatten()
+        # copy the maps so that subsequent versions aren't erroneously used
+        mass_map, sfr_map = tng_Mstar_map.copy(), tng_SFR_map.copy()
         
-        noise_infile = '{}{}/{}_noise.fits'.format(processedDir, subID, filt)
-        with fits.open(noise_infile) as hdu :
-            noise_image = (hdu[0].data*u.Jy).to(u.uJy).value # microjanskys [per pixel]
-        data[:, 2*(i + 1)] = noise_image.flatten()
+        # mask out pixels that aren't in the annulus
+        mass_map[bins_image != val] = np.nan
+        sfr_map[bins_image != val] = np.nan
+        
+        # sum values and place into array
+        tng_annuli_masses[val] = np.nansum(mass_map) # solMass
+        tng_annuli_sfrs[val] = np.nansum(sfr_map) # solMass/yr
     
-    # input spectroscopic redshift information
-    data[:, -1] = 0.5*np.ones(2809)
+    # check the integrated stellar masses
+    # tng_integrated_mass = np.log10(np.trapz(tng_annuli_masses))
+    # fast_integrated_mass = np.log10(np.trapz(np.power(10, lmass)))
+    # print(tng_integrated_mass, fast_integrated_mass)
     
-    fmt = ['%3i'] + 14*['%12.5e'] + ['%.1f']
-    header = 'id F1 E1 F2 E2 F3 E3 F4 E4 F5 E5 F6 E6 F7 E7 z_spec'
-    np.savetxt(outDir + '96771.cat', data, fmt=fmt, header=header)
+    # find the surface mass/SFR densities of the idealized TNG maps
+    tng_Sigma = np.log10(tng_annuli_masses/physical_area_pc2.value)
+    tng_Sigma_SFR = np.log10(tng_annuli_sfrs/physical_area.value)
+    
+    # set the uncertainty for the TNG values
+    zeros = np.zeros_like(tng_Sigma)
+    
+    # convert stellar masses to surface mass densities
+    Sigma = np.log10(np.power(10, lmass)/physical_area_pc2.value)
+    Sigma_lo = np.log10(np.power(10, lmass_lo)/physical_area_pc2.value)
+    Sigma_hi = np.log10(np.power(10, lmass_hi)/physical_area_pc2.value)
+    
+    # convert star formation rates to surface star formation rate densities
+    Sigma_SFR = np.log10(np.power(10, lsfr)/physical_area.value)
+    Sigma_SFR_lo = np.log10(np.power(10, lsfr_lo)/physical_area.value)
+    Sigma_SFR_hi = np.log10(np.power(10, lsfr_hi)/physical_area.value)
+    
+    # set plot attributes
+    xlabel = r'$R$ (kpc)' # r'$\log{(R/R_{\rm e})}$'
+    ylabel1 = r'$\log{(\Sigma/{\rm M}_{\odot}~{\rm pc}^{2})}$'
+    ylabel2 = r'$\log{(\Sigma_{\rm SFR}/{\rm M}_{\odot}~{\rm yr}^{-1}~{\rm kpc}^{2})}$'
+    
+    # plot the radial profiles
+    xs = [rr, rr, rr, rr]
+    ys = [Sigma, tng_Sigma, Sigma_SFR, tng_Sigma_SFR]
+    lo = [Sigma - Sigma_lo, zeros, Sigma_SFR - Sigma_SFR_lo, zeros]
+    hi = [Sigma_hi - Sigma, zeros, Sigma_SFR_hi - Sigma_SFR, zeros]
+    labels = ['fit', 'TNG', '', '']
+    colors = ['k', 'k', 'b', 'b']
+    markers = ['', '', '', '']
+    styles = ['--', '-', '--', '-']
+    
+    plt.plot_multi_vertical_error(xs, ys, lo, hi, labels, colors, markers,
+        styles, 2, xlabel=xlabel, ylabel1=ylabel1, ylabel2=ylabel2)
     
     return
 
-# read the table
-data = np.loadtxt('fastpp/96771_1000_sims.fout')
-dim = np.sqrt(len(data)).astype(int)
+def load_annuli_map(population, subID) :
+    
+    # open the annuli map to use for masking
+    infile = 'bins/{}/subID_{}_annuli.npz'.format(population, subID)
+    bin_data = np.load(infile)
+    
+    bins_image = bin_data['image']
+    numBins = int(np.nanmax(bins_image) + 1) # accounts for python 0-index
+    
+    return bins_image, bins_image.shape[0], numBins
 
-# lmass = data[:, 16]
-# plt.histogram(lmass, 'lmass', bins=53)
+def load_fast_fits(subID) :
+    
+    # load fitted data coming out of FAST++
+    data = np.loadtxt('fitting/photometry.fout', dtype=str)
+    
+    # define which rows to use, based on the 'binNum' containing the subID
+    binNum = data[:, 0]
+    use = np.char.find(binNum, str(subID))
+    use[use < 0] = 1
+    use = np.invert(use.astype(bool))
 
-# plt.display_image_simple(np.rot90(lmass.reshape(dim, dim), k=3), lognorm=False,
-#                          vmin=4, vmax=9) # rotation required to match TNG orientation
+    # get the stellar mass and star formation rates
+    lmass = data[:, 16].astype(float)[use]
+    lmass_lo = data[:, 17].astype(float)[use]
+    lmass_hi = data[:, 18].astype(float)[use]
 
-lsfr = data[:, 19]
-# plt.histogram(lsfr[lsfr > -15], 'lsfr', bins=53)
+    lsfr = data[:, 19].astype(float)[use]
+    lsfr_lo = data[:, 20].astype(float)[use]
+    lsfr_hi = data[:, 21].astype(float)[use]
+    
+    # lssfr = data[:, 22].astype(float)[use]
+    
+    return lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi
 
-plt.display_image_simple(np.rot90(lsfr.reshape(dim, dim), k=3), lognorm=False,
-    vmin=-3.3, vmax=-2.4)
+def load_galaxy_attributes(subID, snap) :
+    
+    infile = 'D:/Documents/GitHub/TNG/TNG50-1/TNG50-1_99_sample(t).hdf5'
+    with h5py.File(infile, 'r') as hf :
+        times = hf['times'][:]
+        subIDfinals = hf['SubhaloID'][:].astype(int)
+        subIDs = hf['subIDs'][:].astype(int)
+        # logM = hf['logM'][:]
+        Re = hf['Re'][:]
+        centers = hf['centers'][:]
+    
+    # find the location of the subID within the entire sample
+    loc = np.where(subIDfinals == subID)[0][0]
+    
+    return times[snap], subIDs[loc, snap], Re[loc, snap], list(centers[loc, snap])
 
-# lssfr = data[:, 22]
-# plt.histogram(lssfr[lssfr > -12], 'lssfr', bins=30)
+def load_photometric_information(population, subID) :
+    
+    # get information that was put into FAST++ about the elliptical annuli
+    infile = 'photometry/{}/subID_{}_photometry.fits'.format(population, subID)
+    table = Table.read(infile)
+    
+    nPixels = table['nPixels'].data*u.pix
+    redshift = table['z'].data[0]
+    scale = table['scale'].data[0]*u.arcsec/u.pix # arcsec/pixel
+    
+    # define the centers of the elliptical annuli for plotting purposes
+    rr = (table['sma'].data - 0.5*table['width'].data)*u.pix # pixels
+    
+    # get the half light radius
+    Re = table['R_e'].data*u.pix
+    
+    return nPixels.astype(int), redshift, scale, rr, Re
 
-# chi2 = data[:, 28]
-# plt.histogram(chi2, 'chi2', bins=20)
-
+def spatial_plot_info(time, snap, mpbsubID, center, Re, edges, delta_t) :
+    
+    # open the TNG cutout and retrieve the relevant information
+    cutout_file = 'F:/TNG50-1/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(snap, mpbsubID)
+    with h5py.File(cutout_file, 'r') as hf :
+        coords = hf['PartType4']['Coordinates'][:]
+        ages = hf['PartType4']['GFM_StellarFormationTime'][:]
+        Mstar = hf['PartType4']['GFM_InitialMass'][:]*1e10/cosmo.h # solMass
+    
+    # limit particles to those that have positive formation times
+    mask = (ages > 0)
+    coords, ages, Mstar = coords[mask], ages[mask], Mstar[mask]
+    
+    # don't project using face-on version
+    dx, dy, dz = (coords - center).T
+    
+    # cosmo.age(redshift) is slow for very large arrays, so we'll work in units
+    # of scalefactor and convert delta_t. t_minus_delta_t is in units of redshift
+    t_minus_delta_t = z_at_value(cosmo.age, time*u.Gyr - delta_t, zmax=np.inf)
+    limit = 1/(1 + t_minus_delta_t) # in units of scalefactor
+    
+    # limit particles to those that formed within the past delta_t time
+    mask = (ages >= limit)
+    
+    sf_masses = Mstar[mask]
+    sf_dx = dx[mask]
+    sf_dy = dy[mask]
+    # sf_dz = dz[mask]
+    
+    # create 2D histograms of the particles and SF particles
+    hh, _, _ = np.histogram2d(dx/Re, dy/Re, bins=(edges, edges),
+                              weights=Mstar)
+    hh = hh.T
+    
+    hh_sf, _, _ = np.histogram2d(sf_dx/Re, sf_dy/Re, bins=(edges, edges),
+                                 weights=sf_masses)
+    hh_sf = hh_sf.T
+    
+    return hh, hh_sf/delta_t.to(u.yr).value

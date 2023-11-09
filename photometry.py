@@ -1,149 +1,149 @@
 
 import os
+import glob
 import numpy as np
 
-from astropy.cosmology import FlatLambdaCDM
 from astropy.table import Table
 import astropy.units as u
 
 from core import open_cutout
 
-cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+def all_fluxes(filters, population='quenched') :
+    
+    outDir = 'photometry/{}/'.format(population)
+    
+    os.makedirs(outDir, exist_ok=True) # ensure the output directory for the
+        # photometric tables is available
+    
+    # table = Table.read('subIDs.fits')
+    # subIDs = table['subIDs'].data
+    subIDs = [96771] # for testing
+    
+    for subID in subIDs :
+        determine_fluxes(subID, filters, population=population)
+    
+    return
 
-def determine_fluxes(cluster, filters) :
-    '''
-    Determine the flux in every annulus/bin for a given object for a given
-    filter. Then move to the next subsequent filter and determine the fluxes
-    in the corresponding bins for that filter. Repeat for all filters.
-    Create a table which includes all determined fluxes. Save table to file
-    for subsequent use with Prospector.
+def determine_fluxes(subID, filters, population='quenched') :
     
-    Parameters
-    ----------
-    cluster : string
-        Operate on the files of this cluster.
-    filters : list
-        The filterset for the cluster.
+    binsDir = 'bins/{}/'.format(population)
+    cutoutDir = 'cutouts/{}/{}/'.format(population, subID)
+    outDir = 'photometry/{}/'.format(population)
+    seppDir = 'detection/{}/{}/'.format(population, subID)
     
-    Returns
-    -------
-    None.
+    infile = binsDir + 'subID_{}_annuli.npz'.format(subID)
+    outfile = outDir + 'subID_{}_photometry.fits'.format(subID)
     
-    '''
+    # load the elliptical annuli bins data
+    bin_data = np.load(infile)
     
-    use_table = Table.read('{}/{}_sample-with-use-cols.fits'.format(
-        cluster, cluster))
+    bins_image = bin_data['image']
+    sma, smb = bin_data['sma'], bin_data['smb']
+    flux, err = bin_data['flux'], bin_data['err']
+    nPixels = bin_data['nPixels']
+    widths, PAs = bin_data['width'], bin_data['pa']
     
-    use_columns = [col for col in use_table.colnames if col.endswith('_use')]
-    IDs = use_table['id']
+    numBins = int(np.nanmax(bins_image) + 1) # accounts for python 0-index
     
-    os.makedirs('{}/photometry'.format(cluster), exist_ok=True) # ensure the
-        # output directory for the photometric tables is available
-    
-    for ID in IDs :
-        row = np.where(IDs == ID)
-        use_vals = (np.array(list(use_table[use_columns][row][0])) == 'TRUE')
+    if not np.isnan(numBins) :
+        photometry = Table()
+        photometry['bin'] = range(numBins)
+        photometry['sma'], photometry['smb'] = sma, smb
+        photometry['flux'], photometry['err'] = flux, err
+        photometry['SN'], photometry['nPixels'] = flux/err, nPixels
+        photometry['width'], photometry['PA'] = widths, PAs
         
-        use_dict = dict(zip(use_columns, use_vals))
+        # get the SourceXtractorPlusPlus-derived segmentation map
+        segmap_file = seppDir + 'segmap.fits'
+        segMap, _ = open_cutout(segmap_file, simple=True)
         
-        outfile = '{}/photometry/{}_ID_{}_photometry.fits'.format(cluster,
-                                                                  cluster, ID)
+        # open the SourceXtractorPlusPlus-derived catalog file
+        catalog = Table.read(seppDir + 'cat.fits')
+        detID = catalog['group_id'].data[0]
+        r_e = catalog['flux_radius'].data[0] # [pix] the half flux radius
         
-        bin_data = np.load('{}/bins/{}_ID_{}_annuli.npz'.format(cluster,
-                                                                cluster, ID))
-        bins_image = bin_data['image']
-        sma, smb = bin_data['sma'], bin_data['smb']
-        flux, err = bin_data['flux'], bin_data['err']
-        nPixels = bin_data['nPixels']
-        widths, PAs = bin_data['width'], bin_data['pa']
-        
-        numBins = np.nanmax(bins_image) + 1 # accounts for python 0-index
-        
-        FUV_mag, U_mag = use_table['M_AB_FUV'][row], use_table['M_AB_U'][row]
-        V_mag, J_mag = use_table['M_AB_V'][row], use_table['M_AB_J'][row]
-        
-        if not np.isnan(numBins) :
-            photometry = Table()
-            photometry['bin'] = range(int(numBins))
-            photometry['sma'], photometry['smb'] = sma, smb
-            photometry['flux'], photometry['err'] = flux, err
-            photometry['SN'], photometry['nPixels'] = flux/err, nPixels
-            photometry['width'], photometry['PA'] = widths, PAs
+        for filt in filters :
             
-            photometry['FUV_mag'] = [FUV_mag]*int(numBins)
-            photometry['U_mag'] = [U_mag]*int(numBins)
-            photometry['V_mag'] = [V_mag]*int(numBins)
-            photometry['J_mag'] = [J_mag]*int(numBins)
+            # open the science images and the corresponding noise images
+            sci_file, noise_file = glob.glob(cutoutDir + filt + '_*.fits')
             
-            for filt in filters :
-                sci_file = '{}/cutouts/{}_ID_{}_{}.fits'.format(
-                    cluster, cluster, ID, filt)
-                noise_file = '{}/cutouts/{}_ID_{}_{}_noise.fits'.format(
-                    cluster, cluster, ID, filt)
-                segmap_file = '{}/cutouts/{}_ID_{}_segmap.fits'.format(
-                    cluster, cluster, ID)
-                bcg_segmap_file = '{}/cutouts/{}_ID_{}_segmap-bCG.fits'.format(
-                    cluster, cluster, ID)
-                
-                (sci, dim, photfnu, r_e,
-                 redshift, sma, smb, pa) = open_cutout(sci_file)
-                noise = open_cutout(noise_file, simple=True)
-                segMap = open_cutout(segmap_file, simple=True)
-                bCGsegMap = open_cutout(bcg_segmap_file, simple=True)
-                
-                # make a copy of the science image and noise image
-                new_sci = sci.copy()
-                new_noise = noise.copy()
-                
-                # mask the copied images based on the segmentation map, but
-                # don't mask out the sky
-                if ID >= 20000 : # the bCGs aren't in the segmap, so mask any other galaxy
-                    new_sci[(segMap > 0) | ((bCGsegMap > 0) & (bCGsegMap != ID))] = 0
-                    new_noise[(segMap > 0) | ((bCGsegMap > 0) & (bCGsegMap != ID))] = 0
-                else : # for the non-bCGs, mask out pixels associated with
-                    new_sci[(segMap > 0) & (segMap != ID)] = 0 # other galaxies
-                    new_noise[(segMap > 0) & (segMap != ID)] = 0
-                
-                # save relevant information for running prospector into the table
-                length = len(range(int(numBins)))
-                photometry['R_e'] = [r_e]*length*u.pix
-                photometry['z'] = [redshift]*length
-                lumDist = cosmo.luminosity_distance(redshift)
-                photometry['lumDist'] = [lumDist.value]*length*u.Mpc
-                
-                fluxes, uncerts, invalid = [], [], []
-                for val in range(int(numBins)) :
-                    # mask = np.where(bins_image == val)
-                    temp_sci, temp_noise = new_sci.copy(), new_noise.copy()
-                    
-                    # masked_sci = new_sci[mask]
-                    # flux = photfnu*np.nansum(masked_sci)
-                    temp_sci[bins_image != val] = np.nan
-                    flux = photfnu*np.nansum(temp_sci)
-                    fluxes.append(flux)
-                    
-                    # masked_noise = new_noise[mask]
-                    # uncert = photfnu*np.sqrt(np.nansum(np.square(masked_noise)))
-                    temp_noise[bins_image != val] = np.nan
-                    uncert = photfnu*np.sqrt(np.nansum(np.square(temp_noise)))
-                    uncerts.append(uncert)
-                    
-                    pix_sci = temp_sci.copy()
-                    pix_sci[pix_sci != 0] = np.nan
-                    pix_sci[pix_sci == 0] = 1
-                    invalid_pix = np.nansum(pix_sci)
-                    invalid.append(invalid_pix)
-                
-                photometry[filt + '_flux'] = fluxes*u.Jy
-                photometry[filt + '_err'] = uncerts*u.Jy
-                
-                valid = nPixels - np.array(invalid)
-                photometry[filt + '_nPix'] = np.int_(valid)
-                
-                for key, value in use_dict.items() :
-                    if filt in key.split('_')[0] :
-                        photometry[key] = [value]*length
+            sci, _, redshift, exptime, area, photfnu, scale = open_cutout(sci_file)
+            noise, _ = open_cutout(noise_file, simple=True)
             
-            photometry.write(outfile)
+            # make a copy of the science image and noise image
+            new_sci = sci.copy()
+            new_noise = noise.copy()
+            
+            # mask the copied images based on the segmentation map, but don't
+            # mask out the sky -> mask out pixels associated with other galaxies
+            new_sci[(segMap > 0) & (segMap != detID)] = 0
+            new_noise[(segMap > 0) & (segMap != detID)] = 0
+            
+            # save extraneous information into the table
+            length = len(range(numBins))
+            photometry['R_e'] = [r_e]*length*u.pix
+            photometry['z'] = [redshift]*length
+            photometry['scale'] = [scale]*length
+            
+            fluxes, uncerts, invalid = [], [], []
+            for val in range(numBins) :
+                temp_sci, temp_noise = new_sci.copy(), new_noise.copy()
+                
+                temp_sci[bins_image != val] = np.nan
+                flux_sum = np.nansum(temp_sci)
+                flux = flux_sum/exptime/area*photfnu
+                fluxes.append(flux)
+                
+                temp_noise[bins_image != val] = np.nan
+                noise_sum = np.sqrt(np.nansum(np.square(temp_noise)))
+                uncert = noise_sum/exptime/area*photfnu
+                uncerts.append(uncert)
+                
+                pix_sci = temp_sci.copy()
+                pix_sci[pix_sci != 0] = np.nan
+                pix_sci[pix_sci == 0] = 1
+                invalid_pix = np.nansum(pix_sci)
+                invalid.append(invalid_pix)
+            
+            photometry[filt + '_flux'] = fluxes*u.Jy
+            photometry[filt + '_err'] = uncerts*u.Jy
+            
+            valid = nPixels - np.array(invalid)
+            photometry[filt + '_nPix'] = np.int_(valid)
+        
+        photometry.write(outfile)
+    
+    return
+
+def join_all_photometry(population='quenched') :
+    
+    inDir = 'photometry/{}/'.format(population)
+    outfile = 'photometry/photometry.cat'
+    
+    # table = Table.read('subIDs.fits')
+    # subIDs = table['subIDs'].data
+    subIDs = [96771] # for testing
+    
+    translate = {'castor_uv':'F1', 'castor_u':'F2', 'castor_g':'F3',
+                 'roman_f106':'F4', 'roman_f129':'F5', 'roman_f158':'F6',
+                 'roman_f184':'F7'}
+    
+    for subID in subIDs :
+        infile = inDir + 'subID_{}_photometry.fits'.format(subID)
+        table = Table.read(infile)
+        bins = [str(subID) + '_' + str(binNum) for binNum in table['bin'].data]
+        
+        columns = [bins]
+        names = ['id']
+        for key in translate.keys():
+            columns.append(table[key + '_flux'].data)
+            names.append(translate[key])
+            columns.append(table[key + '_err'].data)
+            names.append(translate[key].replace('F', 'E'))
+        columns.append(table['z'])
+        names.append('z_spec')
+        
+        new = Table(columns, names=names)
+        new.write(outfile, format='ascii.commented_header')
     
     return
