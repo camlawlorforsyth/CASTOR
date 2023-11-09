@@ -140,7 +140,7 @@ def add_noise_and_psf(subID, telescope, population='quenched',
     for (filt, frame, pivot, width, throughput, exposure, level, Nread, RR,
          photfnu) in zip(filters, data, pivots, widths, throughputs, exposures,
                          nonsource_level, Nreads, read_electrons, photfnus) :
-        
+                         
         # convert the noiseless synthetic SKIRT image to convenient units
         frame = frame.to(u.Jy/np.square(u.arcsec)) # Jy/arcsec^2 [per pixel]
         
@@ -185,20 +185,19 @@ def add_noise_and_psf(subID, telescope, population='quenched',
         if save :
             os.makedirs(outDir, exist_ok=True)
             
-            # outfile = '{}_{}.fits'.format(filt, telescope.split('_')[1])
-            # save_cutout(subtracted.value, outDir + outfile,
-            #             exposure.value, photfnu.value, plate_scale.value, 0.5)
+            outfile = '{}_{}.fits'.format(filt, telescope.split('_')[1])
+            save_cutout(subtracted.value, outDir + outfile, exposure.value,
+                        area.value, photfnu.value, plate_scale.value, 0.5)
             
-            # noise_outfile = '{}_{}_noise.fits'.format(filt, telescope.split('_')[1])
-            # save_cutout(noise.value, outDir + noise_outfile,
-            #             exposure.value, photfnu.value, plate_scale.value, 0.5)
+            noise_outfile = '{}_{}_noise.fits'.format(filt, telescope.split('_')[1])
+            save_cutout(noise.value, outDir + noise_outfile, exposure.value,
+                        area.value, photfnu.value, plate_scale.value, 0.5)
             
             os.makedirs(outDir + '/snr_maps/', exist_ok=True)
             snr_outfile = '{}_{}_snr.png'.format(filt, telescope.split('_')[1])
             plt.display_image_simple(subtracted.value/noise.value,
                 lognorm=False, vmin=0.5, vmax=10, save=True,
                 outfile=outDir + '/snr_maps/' + snr_outfile)
-            
     
     return
 
@@ -548,9 +547,9 @@ def get_noise(pretty_print=False) :
         with open(infile, 'wb') as file :
             pickle.dump(determine_noise_components(), file)
     
-    # if pretty_print :
-    #     import pprint
-    #     pprint.pprint(dictionary)
+    if pretty_print :
+        import pprint
+        pprint.pprint(dictionary)
     
     return dictionary
 
@@ -613,7 +612,7 @@ def process_everything(population='quenched') :
     
     return
 
-def save_cutout(data, outfile, exposure, photfnu, scale, redshift) :
+def save_cutout(data, outfile, exposure, det_area, photfnu, scale, redshift) :
     
     hdu = fits.PrimaryHDU(data)
     
@@ -622,8 +621,10 @@ def save_cutout(data, outfile, exposure, photfnu, scale, redshift) :
     hdr.comments['Z'] = 'object spectroscopic redshift--by definition'
     hdr['EXPTIME'] = exposure
     hdr.comments['EXPTIME'] = 'exposure duration (seconds)--calculated'
+    hdr['AREA'] = det_area
+    hdr.comments['AREA'] = 'detector area (cm2)--calculated'
     hdr['PHOTFNU'] = photfnu
-    hdr.comments['PHOTFNU'] = 'inverse sensitivity, Jy*sec/electron'
+    hdr.comments['PHOTFNU'] = 'inverse sensitivity, Jy*sec*cm2/electron'
     hdr['SCALE'] = scale
     hdr.comments['SCALE'] = 'Pixel size (arcsec) of output image'
     hdr['BUNIT'] = 'electron'
@@ -633,6 +634,32 @@ def save_cutout(data, outfile, exposure, photfnu, scale, redshift) :
     
     return
 
-# 96771, 63871, 198186
-# add_noise_and_psf(96771, 'castor_ultradeep')
-# add_noise_and_psf(96771, 'roman_hlwas')
+def get_largest_psf(telescopes, not_miri=True) :
+    
+    # get the dictionary of all the filter parameters
+    telescope_params = get_noise(pretty_print=0)
+    all_filters = telescope_params.keys()
+    
+    # get all the filters from the specified telescopes
+    filters = []
+    for telescope in telescopes :
+        telescope = telescope.split('_')[0]
+        filters.append([key for key in all_filters if telescope in key])
+    filters = np.concatenate(filters)
+    
+    # get the pivot wavelengths and PSFs for the relevant filters
+    pivots = np.full(len(filters), np.nan)*u.um
+    psfs = np.full(len(filters), np.nan)*u.arcsec
+    for i, filt in enumerate(filters) :
+        pivots[i] = telescope_params[filt]['pivot']
+        psfs[i] = telescope_params[filt]['psf']
+    
+    if not_miri :
+        mask = (pivots < 5*u.um)
+        pivots = pivots[mask]
+        psfs = psfs[mask]
+    
+    print(np.max(psfs)) # the Roman F213 filter (which is not part of the HLWAS)
+                        # is breaking this
+    
+    return
