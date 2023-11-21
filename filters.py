@@ -29,7 +29,7 @@ def calculate_pivots_and_fwhm() :
         dictionary[filt] = {}
         
         # get the wavelength and transmission array from the file, and populate
-        file = 'passbands/{}.txt'.format(filt)
+        file = 'passbands/passbands_micron/{}.txt'.format(filt)
         array = np.genfromtxt(file, skip_header=1)
         waves, transmission = array[:, 0], array[:, 1]
         
@@ -118,7 +118,7 @@ def calculate_psfs() :
 def compare_nircam() :
 
     olddir = 'noise/passbands_JWST_NIRCam_for-4Nov2022-from-JDocs/'
-    newdir = 'passbands/'
+    newdir = 'passbands/passbands_micron/'
     oldfilts = ['F070W_mean_system_throughput.txt',
                 'F090W_mean_system_throughput.txt',
                 'F115W_mean_system_throughput.txt',
@@ -149,8 +149,8 @@ def check_roman() :
     waves = []
     throughputs = []
     for filt in filters :
-        file = np.genfromtxt('passbands/roman_{}.txt'.format(filt),
-                             skip_header=1)
+        file = np.genfromtxt('passbands/passbands_micron/roman_{}.txt'.format(
+            filt), skip_header=1)
         waves.append(file[:, 0])
         throughputs.append(file[:, 1])
     
@@ -164,10 +164,6 @@ def check_roman() :
 
 def prepare_throughputs_for_fastpp() :
     
-    filters = ['castor_uv', 'castor_u', 'castor_g',
-               'roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
-    
-    '''
     filters = ['hst_f218w',   'castor_uv',   'hst_f225w',   'hst_f275w',
                'hst_f336w',   'castor_u',    'hst_f390w',   'hst_f438w',
                'hst_f435w',   'hst_f475w',   'castor_g',    'hst_f555w',
@@ -180,15 +176,14 @@ def prepare_throughputs_for_fastpp() :
                'jwst_f356w',  'jwst_f410m',  'jwst_f444w',  'jwst_f560w',
                'jwst_f770w',  'jwst_f1000w', 'jwst_f1130w', 'jwst_f1280w',
                'jwst_f1500w', 'jwst_f1800w', 'jwst_f2100w', 'jwst_f2550w']
-    '''
     
     for filt in filters :
-        array = np.genfromtxt('passbands/{}.txt'.format(filt))
+        array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
         final = np.array([np.arange(1, len(array) + 1), array[:, 0]*1e4, array[:, 1]]).T
         fmt = ['%-4i', '%12.5e', '%12.5e']
         header = '   {} {}'.format(len(array), filt)
-        np.savetxt('fastpp/passbands/{}.txt'.format(filt), final, fmt=fmt,
-                   header=header, comments='')
+        np.savetxt('passbands/passbands_fastpp_angstrom/{}.txt'.format(filt),
+                   final, fmt=fmt, header=header, comments='')
     
     return
 
@@ -208,9 +203,9 @@ def prepare_throughputs_for_skirt() :
                'jwst_f1500w', 'jwst_f1800w', 'jwst_f2100w', 'jwst_f2550w']
     
     for filt in filters :
-        array = np.genfromtxt('passbands/{}.txt'.format(filt))
+        array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
         final = np.array([array[:, 0]*1e4, array[:, 1]]).T
-        np.savetxt('SKIRT/passbands/{}.txt'.format(filt), final)
+        np.savetxt('passbands/passbands_SKIRT_angstrom/{}.txt'.format(filt), final)
     
     return
 
@@ -224,8 +219,8 @@ def throughputs_castor() :
         
         final = np.genfromtxt(inDir + file)
         
-        np.savetxt('noise/passbands/castor_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
+        np.savetxt('passbands/passbands_micron/castor_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
     
     return
 
@@ -288,7 +283,7 @@ def throughputs_hst() :
         throughput = np.mean([throughput1, throughput2], axis=0)
         
         final = np.array([waves1.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/hst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
         
         # plt.plot_simple_multi([waves1, waves1, waves1],
@@ -309,7 +304,7 @@ def throughputs_hst() :
         throughput = np.mean([throughput1, throughput2], axis=0)
         
         final = np.array([waves1.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/hst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
         
         # plt.plot_simple_multi([waves1, waves1, waves1],
@@ -327,7 +322,7 @@ def throughputs_hst() :
         throughput = bp(waves)
         
         final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/hst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
         
         # plt.plot_simple_multi([waves], [throughput], [''], ['k'], [''], ['-'],
@@ -378,7 +373,7 @@ def throughputs_jwst() :
         throughput = instrument_factory.get_total_eff(waves.value)
         
         final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/jwst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
     
     for filt in lw_filters :
@@ -395,7 +390,7 @@ def throughputs_jwst() :
         throughput = instrument_factory.get_total_eff(waves.value)
         
         final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/jwst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
     
     for filt in miri_filters :
@@ -418,7 +413,7 @@ def throughputs_jwst() :
         throughput = instrument_factory.get_total_eff(waves.value)
         
         final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('noise/passbands/jwst_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
     
     return
@@ -443,7 +438,7 @@ def throughputs_roman() :
         #                      eff_areas[:, i+1]/(area*(1-np.square(0.303))),
         #                      xmin=0.4, xmax=2.5)
         
-        np.savetxt('noise/passbands/roman_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/roman_{}.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
     
     return

@@ -10,7 +10,8 @@ import plotting as plt
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
 
-def compare_fast_output_to_tng(subID, snap, population='quenched', display=False) :
+def compare_fast_output_to_tng(subID, snap, population='quenched',
+                               display=False, realizations=False) :
     
     # get galaxy attributes from TNG
     time, mpbsubID, tngRe, center = load_galaxy_attributes(subID, snap)
@@ -32,10 +33,12 @@ def compare_fast_output_to_tng(subID, snap, population='quenched', display=False
         plt.display_image_simple(bins_image, lognorm=False)
     
     # get the output from FAST++
-    lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi = load_fast_fits(subID)
+    lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi = load_fast_fits(subID,
+        numBins, realizations=realizations)
     
     # get basic information from the photometric table
-    nPixels, redshift, scale, rr, Re = load_photometric_information(population, subID)
+    nPixels, redshift, scale, rr, Re = load_photometric_information(population,
+        subID, realizations=realizations)
     
     # determine the area of a single pixel, in arcsec^2
     pixel_area = np.square(scale*u.pix)
@@ -122,29 +125,54 @@ def load_annuli_map(population, subID) :
     
     return bins_image, bins_image.shape[0], numBins
 
-def load_fast_fits(subID) :
+def load_fast_fits(subID, numBins, realizations=False) :
     
     # load fitted data coming out of FAST++
-    data = np.loadtxt('fitting/photometry.fout', dtype=str)
+    data = np.loadtxt('fitting/photometry_psf_0.15_arcsec.fout', dtype=str)
     
     # define which rows to use, based on the 'binNum' containing the subID
-    binNum = data[:, 0]
-    use = np.char.find(binNum, str(subID))
+    ids = data[:, 0]
+    use = np.char.find(ids, str(subID))
     use[use < 0] = 1
     use = np.invert(use.astype(bool))
-
+    
     # get the stellar mass and star formation rates
     lmass = data[:, 16].astype(float)[use]
-    lmass_lo = data[:, 17].astype(float)[use]
-    lmass_hi = data[:, 18].astype(float)[use]
-
     lsfr = data[:, 19].astype(float)[use]
-    lsfr_lo = data[:, 20].astype(float)[use]
-    lsfr_hi = data[:, 21].astype(float)[use]
-    
     # lssfr = data[:, 22].astype(float)[use]
     
-    return lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi
+    if realizations :
+        
+        # step through every annulus
+        lmass_lo = np.full(numBins, np.nan)
+        lmass_median = np.full(numBins, np.nan)
+        lmass_hi = np.full(numBins, np.nan)
+        lsfr_lo = np.full(numBins, np.nan)
+        lsfr_median = np.full(numBins, np.nan)
+        lsfr_hi = np.full(numBins, np.nan)
+        for annulus in range(numBins) :
+            # find the median +/- 1 sigma uncertainties based on all realizations
+            lmass_tuple = np.percentile(lmass[annulus::numBins], [16, 50, 84])
+            lsfr_tuple = np.percentile(lsfr[annulus::numBins], [16, 50, 84])
+            
+            # place those values into their respective arrays
+            lmass_lo[annulus] = lmass_tuple[0]
+            lmass_median[annulus] = lmass_tuple[1]
+            lmass_hi[annulus] = lmass_tuple[2]
+            
+            lsfr_lo[annulus] = lsfr_tuple[0]
+            lsfr_median[annulus] = lsfr_tuple[1]
+            lsfr_hi[annulus] = lsfr_tuple[2]
+        
+        return lmass_median, lmass_lo, lmass_hi, lsfr_median, lsfr_lo, lsfr_hi
+    else :
+        lmass_lo = data[:, 17].astype(float)[use]
+        lmass_hi = data[:, 18].astype(float)[use]
+        
+        lsfr_lo = data[:, 20].astype(float)[use]
+        lsfr_hi = data[:, 21].astype(float)[use]
+        
+        return lmass, lmass_lo, lmass_hi, lsfr, lsfr_lo, lsfr_hi
 
 def load_galaxy_attributes(subID, snap) :
     
@@ -162,10 +190,13 @@ def load_galaxy_attributes(subID, snap) :
     
     return times[snap], subIDs[loc, snap], Re[loc, snap], list(centers[loc, snap])
 
-def load_photometric_information(population, subID) :
+def load_photometric_information(population, subID, realizations=False) :
     
     # get information that was put into FAST++ about the elliptical annuli
-    infile = 'photometry/{}/subID_{}_photometry.fits'.format(population, subID)
+    if realizations :
+        infile = 'photometry/{}/subID_{}_0_photometry.fits'.format(population, subID)
+    else :
+        infile = 'photometry/{}/subID_{}_photometry.fits'.format(population, subID)
     table = Table.read(infile)
     
     nPixels = table['nPixels'].data*u.pix

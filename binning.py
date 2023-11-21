@@ -18,9 +18,9 @@ def bin_all(population='quenched', detection_filter='roman_f184') :
     os.makedirs(outDir, exist_ok=True) # ensure the output directory for the
         # bins is available
     
-    # table = Table.read('subIDs.fits')
+    # table = Table.read('tools/subIDs.fits')
     # subIDs = table['subIDs'].data
-    subIDs = [96771] # for testing
+    subIDs = [63871, 96771, 198186] # for testing
     
     for subID in subIDs :
         (annuli_map, smas, smbs, fluxes, errs, nPixels, widths,

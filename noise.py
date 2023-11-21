@@ -17,6 +17,20 @@ import plotting as plt
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
+def add_noise_all(population='quenched', psf=0.15*u.arcsec) :
+    
+    # table = Table.read('tools/subIDs.fits')
+    # subIDs = table['subIDs'].data
+    subIDs = [63871, 96771, 198186] # for testing
+    
+    for subID in subIDs :
+        add_noise_and_psf(subID, 'castor_ultradeep', population=population, psf=psf)
+        add_noise_and_psf(subID, 'roman_hlwas', population=population, psf=psf)
+        add_noise_and_psf(subID, 'hst_deep', population=population, psf=psf)
+        add_noise_and_psf(subID, 'jwst_deep', population=population, psf=psf)
+    
+    return
+
 def add_noise_and_psf(subID, telescope, population='quenched',
                       psf=0.15*u.arcsec, display=False, save=True) :
     
