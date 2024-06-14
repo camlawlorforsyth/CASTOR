@@ -19,15 +19,17 @@ warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 def add_noise_all(population='quenched', psf=0.15*u.arcsec) :
     
-    # table = Table.read('tools/subIDs.fits')
-    # subIDs = table['subIDs'].data
-    subIDs = [63871, 96771, 198186] # for testing
+    table = Table.read('tools/subIDs.fits')
+    subIDs = table['subID'].data
+    # subIDs = [63871, 96771, 198186] # for testing
     
     for subID in subIDs :
-        add_noise_and_psf(subID, 'castor_ultradeep', population=population, psf=psf)
-        add_noise_and_psf(subID, 'roman_hlwas', population=population, psf=psf)
-        add_noise_and_psf(subID, 'hst_deep', population=population, psf=psf)
-        add_noise_and_psf(subID, 'jwst_deep', population=population, psf=psf)
+        if subID != 14 :
+            add_noise_and_psf(subID, 'castor_ultradeep', population=population, psf=psf)
+            add_noise_and_psf(subID, 'roman_hlwas', population=population, psf=psf)
+            add_noise_and_psf(subID, 'hst_deep', population=population, psf=psf)
+            add_noise_and_psf(subID, 'jwst_deep', population=population, psf=psf)
+            print('{} done'.format(subID))
     
     return
 
@@ -226,14 +228,21 @@ def background_castor() :
     # from CASTOR ETC:
     # etc = np.array([27.72748, 24.24196, 22.58821])
     
-    inDir = 'passbands/'
-    filters = ['castor_uv', 'castor_u', 'castor_g']
+    inDir = 'passbands/passbands_micron/'
+    filters = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g']
     
     return determine_leo_background(inDir, filters)
 
+def background_euclid() :
+    
+    inDir = 'passbands/passbands_micron/'
+    filters = ['euclid_i', 'euclid_y', 'euclid_j', 'euclid_h']
+    
+    return determine_l2_background(inDir, filters)
+
 def background_hst() :
     
-    inDir = 'passbands/'
+    inDir = 'passbands/passbands_micron/'
     filters = ['hst_f218w', 'hst_f225w', 'hst_f275w', 'hst_f336w',  'hst_f390w',
                'hst_f438w', 'hst_f435w', 'hst_f475w', 'hst_f555w',  'hst_f606w',
                'hst_f625w', 'hst_f775w', 'hst_f814w', 'hst_f850lp', 'hst_f105w',
@@ -243,7 +252,7 @@ def background_hst() :
 
 def background_jwst() :
     
-    inDir = 'passbands/'
+    inDir = 'passbands/passbands_micron/'
     filters = ['jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
                'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
                'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
@@ -254,7 +263,7 @@ def background_jwst() :
 
 def background_roman() :
     
-    inDir = 'passbands/'
+    inDir = 'passbands/passbands_micron/'
     filters = ['roman_f062', 'roman_f087', 'roman_f106', 'roman_f129',
                'roman_f146', 'roman_f158', 'roman_f184', 'roman_f213']
     
@@ -466,12 +475,13 @@ def determine_noise_components() :
     
     dictionary = filters.calculate_psfs()
     
-    # CASTOR plate scales
+    # CASTOR
     castor_filts = [key for key in dictionary.keys() if 'castor' in key]
-    castor_scales = 0.1*np.ones(3)*u.arcsec/u.pix
+    castor_scales = 0.1*np.ones(5)*u.arcsec/u.pix
     castor_bkg = background_castor()*u.mag/np.square(u.arcsec)
-    castor_dark = np.array([0.00042, 0.00042, 0.002])*u.electron/u.s/u.pix
-    castor_read = np.array([3.15, 3.15, 4.45])*u.electron/u.pix
+    castor_dark = np.array([0.00042, 0.00042, 0.00042, 0.00042,
+                            0.002])*u.electron/u.s/u.pix
+    castor_read = np.array([3.15, 3.15, 3.15, 3.15, 4.45])*u.electron/u.pix
     castor_scalings = np.square(castor_scales)/np.square(0.05*u.arcsec/u.pix)
     castor_dark = castor_dark/castor_scalings
     castor_read = castor_read/castor_scalings
@@ -481,7 +491,7 @@ def determine_noise_components() :
         dictionary[filt]['dark_current'] = dark
         dictionary[filt]['read_noise'] = read
     
-    # HST plate scales
+    # HST
     hst_filts = [key for key in dictionary.keys() if 'hst' in key]
     hst_scales = np.array([0.0395, 0.0395, 0.0395, 0.0395, 0.0395, 0.0395,
                            0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05,
@@ -502,7 +512,7 @@ def determine_noise_components() :
         dictionary[filt]['dark_current'] = dark
         dictionary[filt]['read_noise'] = read
     
-    # JWST plate scales
+    # JWST
     jwst_filts = [key for key in dictionary.keys() if 'jwst' in key]
     jwst_scales = np.array([0.031, 0.031, 0.031, 0.031, 0.031, 0.063, 0.063,
                             0.063, 0.063, 0.11, 0.11, 0.11, 0.11, 0.11, 0.11,
@@ -522,7 +532,7 @@ def determine_noise_components() :
         dictionary[filt]['dark_current'] = dark
         dictionary[filt]['read_noise'] = read
     
-    # Roman plate scales
+    # Roman
     roman_filts = [key for key in dictionary.keys() if 'roman' in key]
     roman_scales = 0.11*np.ones(8)*u.arcsec/u.pix
     roman_bkg = background_roman()*u.mag/np.square(u.arcsec)
@@ -533,6 +543,21 @@ def determine_noise_components() :
     roman_read = roman_read/roman_scalings
     for filt, bkg, dark, read in zip(roman_filts, roman_bkg, roman_dark,
                                      roman_read) :
+        dictionary[filt]['background'] = bkg
+        dictionary[filt]['dark_current'] = dark
+        dictionary[filt]['read_noise'] = read
+    
+    # Euclid
+    euclid_filts = [key for key in dictionary.keys() if 'euclid' in key]
+    euclid_scales = np.array([0.1, 0.298, 0.298, 0.298])*u.arcsec/u.pix
+    euclid_bkg = background_euclid()*u.mag/np.square(u.arcsec)
+    euclid_dark = np.array([0.001, 0.02, 0.02, 0.02])*u.electron/u.s/u.pix
+    euclid_read = np.array([4.4, 6.1, 6.1, 6.1])*u.electron/u.pix
+    euclid_scalings = np.square(euclid_scales)/np.square(0.05*u.arcsec/u.pix)
+    euclid_dark = euclid_dark/euclid_scalings
+    euclid_read = euclid_read/euclid_scalings
+    for filt, bkg, dark, read in zip(euclid_filts, euclid_bkg, euclid_dark,
+                                     euclid_read) :
         dictionary[filt]['background'] = bkg
         dictionary[filt]['dark_current'] = dark
         dictionary[filt]['read_noise'] = read
@@ -559,7 +584,8 @@ def get_noise(pretty_print=False) :
             dictionary = pickle.load(file)
     else :
         with open(infile, 'wb') as file :
-            pickle.dump(determine_noise_components(), file)
+            dictionary = determine_noise_components()
+            pickle.dump(dictionary, file)
     
     if pretty_print :
         import pprint
@@ -612,20 +638,6 @@ def mag_to_Jy(mag) :
     mag = mag.to(u.mag/np.square(u.arcsec))
     return np.power(10, -0.4*(mag.value - 8.9))*u.Jy/np.square(u.arcsec)
 
-def process_everything(population='quenched') :
-    
-    inDir = 'SKIRT/SKIRT_output_{}/'.format(population)
-    subIDs = np.sort(np.int_(os.listdir(inDir)))
-    
-    for subID in subIDs :
-        if subID != 14 :
-            add_noise_and_psf(subID, 'castor_ultradeep')
-            add_noise_and_psf(subID, 'roman_hlwas')
-            # add_noise_and_psf(subID, 'hst_deep')
-            # add_noise_and_psf(subID, 'jwst_deep')
-    
-    return
-
 def save_cutout(data, outfile, exposure, det_area, photfnu, scale, redshift) :
     
     hdu = fits.PrimaryHDU(data)
@@ -651,7 +663,7 @@ def save_cutout(data, outfile, exposure, det_area, photfnu, scale, redshift) :
 def get_largest_psf(telescopes, not_miri=True) :
     
     # get the dictionary of all the filter parameters
-    telescope_params = get_noise(pretty_print=0)
+    telescope_params = get_noise(pretty_print=False)
     all_filters = telescope_params.keys()
     
     # get all the filters from the specified telescopes

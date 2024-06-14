@@ -10,7 +10,9 @@ import plotting as plt
 
 def calculate_pivots_and_fwhm() :
     
-    filters = ['castor_uv',   'castor_u',    'castor_g',
+    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
+               'castor_g',
+               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
                'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
                'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
                'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
@@ -113,11 +115,18 @@ def calculate_psfs() :
     for filt, psf in zip(roman_filts, roman_psfs) :
         dictionary[filt]['psf'] = psf
     
+    # Euclid PSF FWHMs
+    euclid_filts = [key for key in dictionary.keys() if 'euclid' in key]
+    euclid_scales = np.array([0.1, 0.298, 0.298, 0.298])*u.arcsec/u.pix
+    euclid_psfs = np.array([1.3, 1.10, 1.17, 1.19])*u.pix # from Euclid Collab+Mellier+2024
+    for filt, psf in zip(euclid_filts, euclid_scales*euclid_psfs) :
+        dictionary[filt]['psf'] = psf
+    
     return dictionary
 
 def compare_nircam() :
 
-    olddir = 'noise/passbands_JWST_NIRCam_for-4Nov2022-from-JDocs/'
+    olddir = 'passbands/passbands_JWST_NIRCam_for-4Nov2022-from-JDocs/'
     newdir = 'passbands/passbands_micron/'
     oldfilts = ['F070W_mean_system_throughput.txt',
                 'F090W_mean_system_throughput.txt',
@@ -164,18 +173,21 @@ def check_roman() :
 
 def prepare_throughputs_for_fastpp() :
     
-    filters = ['hst_f218w',   'castor_uv',   'hst_f225w',   'hst_f275w',
-               'hst_f336w',   'castor_u',    'hst_f390w',   'hst_f438w',
-               'hst_f435w',   'hst_f475w',   'castor_g',    'hst_f555w',
-               'hst_f606w',   'roman_f062',  'hst_f625w',   'jwst_f070w',
-               'hst_f775w',   'hst_f814w',   'roman_f087',  'jwst_f090w',
-               'hst_f850lp',  'hst_f105w',   'roman_f106',  'hst_f110w',
-               'jwst_f115w',  'hst_f125w',   'roman_f129',  'hst_f140w',
-               'roman_f146',  'jwst_f150w',  'hst_f160w',   'roman_f158',
-               'roman_f184',  'jwst_f200w',  'roman_f213',  'jwst_f277w',
-               'jwst_f356w',  'jwst_f410m',  'jwst_f444w',  'jwst_f560w',
-               'jwst_f770w',  'jwst_f1000w', 'jwst_f1130w', 'jwst_f1280w',
-               'jwst_f1500w', 'jwst_f1800w', 'jwst_f2100w', 'jwst_f2550w']
+    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
+               'castor_g',
+               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
+               'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
+               'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
+               'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
+               'hst_f814w',   'hst_f850lp',  'hst_f105w',   'hst_f110w',
+               'hst_f125w',   'hst_f140w',   'hst_f160w',
+               'jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
+               'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
+               'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
+               'jwst_f1130w', 'jwst_f1280w', 'jwst_f1500w', 'jwst_f1800w',
+               'jwst_f2100w', 'jwst_f2550w',
+               'roman_f062',  'roman_f087',  'roman_f106',  'roman_f129',
+               'roman_f146',  'roman_f158',  'roman_f184',  'roman_f213']
     
     for filt in filters :
         array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
@@ -189,18 +201,21 @@ def prepare_throughputs_for_fastpp() :
 
 def prepare_throughputs_for_skirt() :
     
-    filters = ['hst_f218w',   'castor_uv',   'hst_f225w',   'hst_f275w',
-               'hst_f336w',   'castor_u',    'hst_f390w',   'hst_f438w',
-               'hst_f435w',   'hst_f475w',   'castor_g',    'hst_f555w',
-               'hst_f606w',   'roman_f062',  'hst_f625w',   'jwst_f070w',
-               'hst_f775w',   'hst_f814w',   'roman_f087',  'jwst_f090w',
-               'hst_f850lp',  'hst_f105w',   'roman_f106',  'hst_f110w',
-               'jwst_f115w',  'hst_f125w',   'roman_f129',  'hst_f140w',
-               'roman_f146',  'jwst_f150w',  'hst_f160w',   'roman_f158',
-               'roman_f184',  'jwst_f200w',  'roman_f213',  'jwst_f277w',
-               'jwst_f356w',  'jwst_f410m',  'jwst_f444w',  'jwst_f560w',
-               'jwst_f770w',  'jwst_f1000w', 'jwst_f1130w', 'jwst_f1280w',
-               'jwst_f1500w', 'jwst_f1800w', 'jwst_f2100w', 'jwst_f2550w']
+    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
+               'castor_g',
+               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
+               'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
+               'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
+               'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
+               'hst_f814w',   'hst_f850lp',  'hst_f105w',   'hst_f110w',
+               'hst_f125w',   'hst_f140w',   'hst_f160w',
+               'jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
+               'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
+               'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
+               'jwst_f1130w', 'jwst_f1280w', 'jwst_f1500w', 'jwst_f1800w',
+               'jwst_f2100w', 'jwst_f2550w',
+               'roman_f062',  'roman_f087',  'roman_f106',  'roman_f129',
+               'roman_f146',  'roman_f158',  'roman_f184',  'roman_f213']
     
     for filt in filters :
         array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
@@ -211,7 +226,7 @@ def prepare_throughputs_for_skirt() :
 
 def throughputs_castor() :
     
-    inDir = 'noise/passbands_CASTOR_for-Phase0-from-CASTOR-ETC/'
+    inDir = 'passbands/passbands_CASTOR_Phase-0-ETC-github/'
     files = ['passband_castor.uv', 'passband_castor.u', 'passband_castor.g']
     
     for file in files :
@@ -220,6 +235,47 @@ def throughputs_castor() :
         final = np.genfromtxt(inDir + file)
         
         np.savetxt('passbands/passbands_micron/castor_{}.txt'.format(filt),
+                    final, header='WAVELENGTH THROUGHPUT')
+    
+    inDir = 'passbands/passbands_CASTOR_Phase-0-ETC-notebooks-github/'
+    files = ['passband_castor.uv_split_bb', 'passband_castor.u_split_bb']
+    filts = ['uvL', 'uS']
+    
+    for file, filt in zip(files, filts) :
+        final = np.loadtxt(inDir + file)
+        np.savetxt('passbands/passbands_micron/castor_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    return
+
+def throughputs_euclid() :
+    
+    # http://svo2.cab.inta-csic.es/svo/theory/fps/index.php?id=Euclid/VIS.vis&&
+    # mode=browse&gname=Euclid&gname2=VIS#filter
+    
+    # https://euclid.esac.esa.int/msp/refdata/nisp/NISP-PHOTO-PASSBANDS-V1
+    
+    inDir = 'passbands/passbands_Euclid_for-2021-11-01-from-ESA/'
+    
+    vis = np.loadtxt(inDir + 'Euclid_VIS.vis.dat')
+    vis = np.array([vis[:, 0]/1e4, vis[:, 1]]).T
+    
+    np.savetxt('passbands/passbands_micron/euclid_i.txt', vis,
+                header='WAVELENGTH THROUGHPUT')
+    
+    files = ['NISP-PHOTO-PASSBANDS-V1-Y_throughput.dat',
+             'NISP-PHOTO-PASSBANDS-V1-J_throughput.dat',
+             'NISP-PHOTO-PASSBANDS-V1-H_throughput.dat']
+    filts = ['y', 'j', 'h']
+    
+    for file, filt in zip(files, filts) :
+        data = np.loadtxt(inDir + file)
+        waves = data[:, 0]/1000
+        trans = data[:, 1]
+        trans[trans < 0] = 0
+        final = np.array([waves, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/euclid_{}.txt'.format(filt),
                    final, header='WAVELENGTH THROUGHPUT')
     
     return
@@ -424,7 +480,7 @@ def throughputs_roman() :
     
     # https://roman.gsfc.nasa.gov/science/Roman_Reference_Information.html
     
-    inDir = 'noise/passbands_Roman_for-14Jun2021-from-GSFC/'
+    inDir = 'passbands/passbands_Roman_for-14Jun2021-from-GSFC/'
     eff_areas = np.genfromtxt(inDir + 'Roman_effarea_20210614.csv',
                               delimiter=',', skip_header=1)
     area = np.pi*np.square(1.18) # Roman will be 2.36 m in diameter
