@@ -12,7 +12,7 @@ def calculate_pivots_and_fwhm() :
     
     filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
                'castor_g',
-               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
+               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
                'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
                'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
                'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
@@ -175,7 +175,7 @@ def prepare_throughputs_for_fastpp() :
     
     filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
                'castor_g',
-               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
+               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
                'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
                'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
                'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
@@ -203,7 +203,7 @@ def prepare_throughputs_for_skirt() :
     
     filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
                'castor_g',
-               'euclid_i',    'euclid_y',    'euclid_j',    'euclid_h',
+               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
                'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
                'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
                'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
@@ -260,13 +260,13 @@ def throughputs_euclid() :
     vis = np.loadtxt(inDir + 'Euclid_VIS.vis.dat')
     vis = np.array([vis[:, 0]/1e4, vis[:, 1]]).T
     
-    np.savetxt('passbands/passbands_micron/euclid_i.txt', vis,
+    np.savetxt('passbands/passbands_micron/euclid_ie.txt', vis,
                 header='WAVELENGTH THROUGHPUT')
     
     files = ['NISP-PHOTO-PASSBANDS-V1-Y_throughput.dat',
              'NISP-PHOTO-PASSBANDS-V1-J_throughput.dat',
              'NISP-PHOTO-PASSBANDS-V1-H_throughput.dat']
-    filts = ['y', 'j', 'h']
+    filts = ['ye', 'je', 'he']
     
     for file, filt in zip(files, filts) :
         data = np.loadtxt(inDir + file)
