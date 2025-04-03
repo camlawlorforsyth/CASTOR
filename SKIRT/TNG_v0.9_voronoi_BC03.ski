@@ -85,8 +85,22 @@
                             <ConfigurableBandWavelengthGrid>
                                 <bands type="Band">
                                     <BroadBand bandName="CASTOR_UV" />
+									<BroadBand bandName="CASTOR_UVL" />
+									<BroadBand bandName="CASTOR_US" />
 									<BroadBand bandName="CASTOR_U" />
                                     <BroadBand bandName="CASTOR_G" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Euclid" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="EUCLID_IE" />
+									<BroadBand bandName="EUCLID_YE" />
+									<BroadBand bandName="EUCLID_JE" />
+									<BroadBand bandName="EUCLID_HE" />
 								</bands>
                             </ConfigurableBandWavelengthGrid>
                         </wavelengthGrid>
@@ -163,18 +177,5 @@
                 </instruments>
             </InstrumentSystem>
         </instrumentSystem>
-        <probeSystem type="ProbeSystem">
-            <ProbeSystem>
-                <probes type="Probe">
-                    <ConvergenceInfoProbe probeName="cnv" wavelength="0.55 micron" probeAfter="Setup" />
-                    <ConvergenceCutsProbe probeName="dns" probeAfter="Setup" />
-                    <TemperatureProbe probeName="tmp" aggregation="Type" probeAfter="Run">
-                        <form type="Form">
-                            <DefaultCutsForm />
-                        </form>
-                    </TemperatureProbe>
-                </probes>
-            </ProbeSystem>
-        </probeSystem>
     </MonteCarloSimulation>
 </skirt-simulation-hierarchy>

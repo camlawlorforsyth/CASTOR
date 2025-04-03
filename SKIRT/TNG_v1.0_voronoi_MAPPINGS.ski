@@ -96,6 +96,8 @@
                             <ConfigurableBandWavelengthGrid>
                                 <bands type="Band">
                                     <BroadBand bandName="CASTOR_UV" />
+									<BroadBand bandName="CASTOR_UVL" />
+									<BroadBand bandName="CASTOR_US" />
 									<BroadBand bandName="CASTOR_U" />
                                     <BroadBand bandName="CASTOR_G" />
 								</bands>
@@ -171,21 +173,200 @@
                             </ConfigurableBandWavelengthGrid>
                         </wavelengthGrid>
                     </FrameInstrument>
+					<FrameInstrument instrumentName="Av_ext" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="JOHNSON_V000" />
+									<BroadBand bandName="JOHNSON_V025" />
+									<BroadBand bandName="JOHNSON_V050" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument><!--below are the low resolution instruments at artificially high resolution-->
+					<FrameInstrument instrumentName="GALEX" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="GALEX_F150" />
+									<BroadBand bandName="GALEX_F230" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Euclid" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="EUCLID_IE" />
+									<BroadBand bandName="EUCLID_YE" />
+									<BroadBand bandName="EUCLID_JE" />
+									<BroadBand bandName="EUCLID_HE" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="WISE" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="WISE_F34" />
+									<BroadBand bandName="WISE_F46" />
+									<BroadBand bandName="WISE_F12" />
+									<BroadBand bandName="WISE_F22" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Spitzer" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="SPITZER_F36" />
+									<BroadBand bandName="SPITZER_F45" />
+									<BroadBand bandName="SPITZER_F58" />
+									<BroadBand bandName="SPITZER_F80" />
+									<BroadBand bandName="SPITZER_F24" />
+									<BroadBand bandName="SPITZER_F70" />
+									<BroadBand bandName="SPITZER_F160" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="HERSCHEL_F70" />
+									<BroadBand bandName="HERSCHEL_F100" />
+									<BroadBand bandName="HERSCHEL_F160" />
+									<BroadBand bandName="HERSCHEL_F250" />
+									<BroadBand bandName="HERSCHEL_F350" />
+									<BroadBand bandName="HERSCHEL_F500" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument><!--below are the low resolution instruments at native resolution-->
+					<FrameInstrument instrumentName="GALEX_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="GALEX_F150" />
+									<BroadBand bandName="GALEX_F230" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Euclid_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+									<BroadBand bandName="EUCLID_YE" />
+									<BroadBand bandName="EUCLID_JE" />
+									<BroadBand bandName="EUCLID_HE" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="WISE_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="WISE_F34" />
+									<BroadBand bandName="WISE_F46" />
+									<BroadBand bandName="WISE_F12" />
+									<BroadBand bandName="WISE_F22" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Spitzer_IRAC_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="SPITZER_F36" />
+									<BroadBand bandName="SPITZER_F45" />
+									<BroadBand bandName="SPITZER_F58" />
+									<BroadBand bandName="SPITZER_F80" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Spitzer_24_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="SPITZER_F24" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Spitzer_70_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="SPITZER_F70" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Spitzer_160_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="SPITZER_F160" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel_PACS_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+                                    <BroadBand bandName="HERSCHEL_F70" />
+									<BroadBand bandName="HERSCHEL_F100" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel_160_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+									<BroadBand bandName="HERSCHEL_F160" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel_250_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+									<BroadBand bandName="HERSCHEL_F250" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel_350_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+									<BroadBand bandName="HERSCHEL_F350" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
+					<FrameInstrument instrumentName="Herschel_500_lr" distance="distance" inclination="0 deg" azimuth="0 deg" roll="0 deg" fieldOfViewX="fov" numPixelsX="nPix" centerX="0 pc" fieldOfViewY="fov" numPixelsY="nPix" centerY="0 pc" recordComponents="false" numScatteringLevels="0" recordPolarization="false" recordStatistics="false">
+                        <wavelengthGrid type="WavelengthGrid">
+                            <ConfigurableBandWavelengthGrid>
+                                <bands type="Band">
+									<BroadBand bandName="HERSCHEL_F500" />
+								</bands>
+                            </ConfigurableBandWavelengthGrid>
+                        </wavelengthGrid>
+                    </FrameInstrument>
                 </instruments>
             </InstrumentSystem>
         </instrumentSystem>
-        <probeSystem type="ProbeSystem">
-            <ProbeSystem>
-                <probes type="Probe">
-                    <ConvergenceInfoProbe probeName="cnv" wavelength="0.55 micron" probeAfter="Setup" />
-                    <ConvergenceCutsProbe probeName="dns" probeAfter="Setup" />
-                    <TemperatureProbe probeName="tmp" aggregation="Type" probeAfter="Run">
-                        <form type="Form">
-                            <DefaultCutsForm />
-                        </form>
-                    </TemperatureProbe>
-                </probes>
-            </ProbeSystem>
-        </probeSystem>
     </MonteCarloSimulation>
 </skirt-simulation-hierarchy>
