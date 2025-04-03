@@ -1,5 +1,6 @@
 
 from os import makedirs
+from os.path import exists
 import numpy as np
 
 import astropy.constants as c
@@ -7,22 +8,22 @@ from astropy.cosmology import FlatLambdaCDM
 from astropy.table import Table
 import astropy.units as u
 import h5py
-from scipy.optimize import curve_fit
 from scipy.stats import truncnorm
 import xml.etree.ElementTree as ET
 
-from core import find_nearest
-import plotting as plt
-from projection import (calculate_MoI_tensor, radial_distances,
-                        rotation_matrix_from_MoI_tensor)
+from projection import calculate_MoI_tensor, rotation_matrix_from_MoI_tensor
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
 
-def check_Ngas_particles() :
+import warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+def save_all_skirt_input(print_input=False) :
     
     # open requisite information about the sample
-    with h5py.File('TNG50-1/TNG50-1_99_sample(t).hdf5', 'r') as hf :
-        redshifts = hf['redshifts'][:]
+    file = 'D:/Documents/GitHub/TNG/TNG50-1/TNG50-1_99_sample(t).hdf5'
+    with h5py.File(file, 'r') as hf :
+        # redshifts = hf['redshifts'][:]
         times = hf['times'][:]
         subIDfinals = hf['SubhaloID'][:]
         subIDs = hf['subIDs'][:].astype(int)
@@ -30,10 +31,19 @@ def check_Ngas_particles() :
         Res = hf['Re'][:]
         centers = hf['centers'][:]
         quenched = hf['quenched'][:]
-        ionsets = hf['onset_indices'][:]
+        # ionsets = hf['onset_indices'][:]
         tonsets = hf['onset_times'][:]
-        iterms = hf['termination_indices'][:]
+        # iterms = hf['termination_indices'][:]
         tterms = hf['termination_times'][:]
+    
+    # get the quenching mechanisms
+    mech_file = 'D:/Documents/GitHub/TNG/TNG50-1/TNG50-1_99_mechanism.hdf5'
+    with h5py.File(mech_file, 'r') as hf :
+        io = hf['inside-out'][:] # 103
+        oi = hf['outside-in'][:] # 109
+        uni = hf['uniform'][:]   # 8
+        amb = hf['ambiguous'][:] # 58
+    mechs = np.sum(np.array([1*io, 3*oi, 5*uni, 5*amb]).T, axis=1)
     
     # define a mask to select the quenched galaxies with sufficient solar mass
     mask = quenched & (logM[:, -1] >= 9.5)
@@ -44,226 +54,257 @@ def check_Ngas_particles() :
     logM = logM[mask]
     Res = Res[mask]
     centers = centers[mask]
-    ionsets = ionsets[mask]
+    # ionsets = ionsets[mask]
     tonsets = tonsets[mask]
-    iterms = iterms[mask]
+    # iterms = iterms[mask]
     tterms = tterms[mask]
+    mechs = mechs[mask]
     
-    # find the snapshot corresponding to roughly 75% of the way through the
-    # quenching episode, and the redshift at that snapshot
-    iseventys = np.array(find_nearest(times, tonsets + 0.75*(tterms - tonsets)))
-    z_75 = redshifts[iseventys]
+    # find the first snapshot >=75% of the way through the quenching episode
+    t75s = tonsets + 0.75*(tterms - tonsets)
+    i75s = np.full(278, -1)
+    for i, t75 in enumerate(t75s) :
+        i75s[i] = np.where(times >= t75)[0][0]
     
-    # get stellar masses and sizes at those snapshots
     firstDim = np.arange(278)
-    subs = subIDs[firstDim, iseventys]
-    masses = logM[firstDim, iseventys]
-    rads = Res[firstDim, iseventys]*u.kpc # ckpc/h
-    cents = centers[firstDim, iseventys]
+    subIDs = subIDs[firstDim, i75s]
+    Res = Res[firstDim, i75s]
+    centers = centers[firstDim, i75s]
     
-    dim = (10*rads)*cosmo.arcsec_per_kpc_comoving(z_75)/(0.05*u.arcsec/u.pix)
-    dim = np.ceil(dim).astype(int)
+    # save a table for future use with core information for saving, adding noise,
+    # creating photometry tables, and fitting
+    tools_file = 'tools/subIDs.fits'
+    if not exists(tools_file) :
+        table = Table([subIDfinals, i75s, Res*u.kpc, mechs],
+                      names=('subID', 'snapshot', 'Re', 'mech'))
+        table.write(tools_file)
     
-    '''
-    for subIDfinal, iseventy, subID, Re, center in zip(subIDfinals,
-        iseventys, subs, rads, cents) :
-        params = [subIDfinal, iseventy, subID, Re.value, center.tolist()]
-        print('save_skirt_input' + str(tuple(params)))
-    '''
+    # print the input calls
+    if print_input :
+        for subIDfinal, i75, subID, Re, center in zip(subIDfinals, i75s,
+            subIDs, Res, centers) :
+            params = [int(subIDfinal), int(i75), int(subID), float(Re), center.tolist()]
+            # if not (save_gas or save_stars) :
+            #     params += ['save_gas=False, save_stars=False']
+            params = str(tuple(params)).replace("'", "")
+            print('save_skirt_input' + params)
     
-    Nstars, Ngass = [], []
-    Nstar_maskeds, Ngas_maskeds = [], []
-    for snap, subID, Re, center in zip(iseventys, subs, rads.value, cents) :
-        inDir = 'F:/TNG50-1/mpb_cutouts_099/'
-        cutout_file = inDir + 'cutout_{}_{}.hdf5'.format(snap, subID)
-        
-        with h5py.File(cutout_file, 'r') as hf :
-            star_coords = hf['PartType4/Coordinates'][:]
-            star_rs = radial_distances(center, star_coords)
-            
-            # only one galaxy have no gas particles at all
-            if 'PartType0' not in hf.keys() :
-                gas_rs = []
-            else :
-                gas_coords = hf['PartType0/Coordinates'][:]
-                gas_rs = radial_distances(center, gas_coords)
-        
-        Nstar = len(star_rs)
-        Ngas = len(gas_rs)
-        
-        Nstar_masked = len(star_rs[star_rs <= 5*Re])
-        
-        if Ngas == 0 :
-            Ngas_masked = 0
-        else :
-            Ngas_masked = len(gas_rs[gas_rs <= 5*Re])
-        
-        Nstars.append(Nstar)
-        Ngass.append(Ngas)
-        Nstar_maskeds.append(Nstar_masked)
-        Ngas_maskeds.append(Ngas_masked) # an additional galaxy has no gas <= 5Re
-
-    tt = Table([subIDfinals, logM[:, -1],
-                subs, masses, iseventys, z_75, rads,
-                Nstars, Nstar_maskeds, Ngass, Ngas_maskeds, dim],
-               names=('subID', 'logM',
-                      'subID_75', 'logM_75', 'snap_75', 'z_75', 'Re_75',
-                      'Nstar', 'Nstar_5Re', 'Ngas', 'Ngas_5Re', 'dim'))
-    # tt.write('SKIRT/Ngas_particles_with_dim.fits')
+    # mask the sample to only the inside-out and outside-in population
+    mech_mask = (mechs == 1) | (mechs == 3)
     
-    # from pypdf import PdfWriter
-    # merger = PdfWriter()
-    # inDir = 'TNG50-1/figures/comprehensive_plots/'
-    # for subID in subIDfinals[np.argsort(z_75)] :
-    #     merger.append(inDir + 'subID_{}.pdf'.format(subID))
-    # outfile = 'SKIRT/comprehensive_plots_by_z75.pdf'
-    # merger.write(outfile)
-    # merger.close()
+    # save the input
+    for subIDfinal, i75, subID, Re, center in zip(subIDfinals[mech_mask],
+        i75s[mech_mask], subIDs[mech_mask], Res[mech_mask], centers[mech_mask]) :
+        # subIDfinal 43 at snap 94 (mpbsubID 53) does not have any gas cells
+        if subIDfinal != 43 :
+            save_skirt_input(subIDfinal, i75, subID, Re, center) # default
+            # save_skirt_input(subIDfinal, i75, subID, Re, center, # z = 0.25
+            #     save_gas=False, save_stars=False, model_redshift=0.25)
+            # save_skirt_input(subIDfinal, i75, subID, Re, center,
+            #     save_gas=False, save_stars=False) # rerun to save image for Av
+            # save_skirt_input(subIDfinal, i75, subID, Re, center, # z = 0.25 rerun
+            #     save_gas=False, save_stars=False, model_redshift=0.25)
+    
+    # for subIDfinal, i75, subID, Re, center in zip(subIDfinals, i75s,
+    #     subIDs, Res, centers) :
+    #     inDir = 'F:/TNG50-1/mpb_cutouts_099/'
+    #     infile = inDir + 'cutout_{}_{}.hdf5'.format(i75, subID)
+    #     if (i75 == 94) and (subID == 53) :
+    #         print(subIDfinal)
+    #         with h5py.File(infile, 'r') as hf :
+    #             print(hf['PartType4'].keys())
+    #     with h5py.File(infile, 'r') as hf :
+    #         if 'PartType0' not in hf.keys() :
+    #             print('snap = {}'.format(i75))
+    #             print('mpbsubID = {}'.format(subID))
+    #         if 'GFM_Metallicity' not in hf['PartType4'].keys() :
+    #             print('snap = {}'.format(i75))
+    #             print('mpbsubID = {}'.format(subID))
     
     return
-
-def determine_runtime_with_photons() :
-    
-    xs = np.log10([1e6, 3162278, 1e7, 31622777, 1e8, 316227767, 1e9, 1e10])
-    ys = np.log10([62, 70, 78, 124, 255, 696, 2177, 19333])
-    
-    popt_quad, _ = curve_fit(parabola, xs, ys, p0=[0.15, -1.8, 7.1])
-    popt_exp, _ = curve_fit(exponential, xs, ys, p0=[0.040, 0.44, 1.1])
-    
-    xlin = np.linspace(6, 10, 100)
-    ylin_para = parabola(xlin, *popt_quad)
-    ylin_exp = exponential(xlin, *popt_exp)
-    
-    plt.plot_simple_multi([xlin, xlin, xs], [ylin_para, ylin_exp, ys],
-        [r'$f(x) = ax^2 + bx + c$', r'$f(x) = Ae^{Bx} + C$', 'data'],
-        ['r', 'b', 'k'], ['', '', 'o'], ['-', '--', ''], [1, 0.3, 1],
-        xlabel=r'$\log(N_{\rm photons})$',
-        ylabel=r'$\log({\rm runtime}/{\rm s})$', scale='linear')
-    
-    return
-
-def exponential(xx, AA, BB, CC) :
-    return AA*np.exp(BB*xx) + CC
-
-def make_rgb() :
-    
-    import matplotlib.pyplot as plt
-    
-    from astropy.io import fits
-    from astropy.visualization import make_lupton_rgb
-    
-    inDir = 'SKIRT/subID_513105_1e10/'
-    infile = 'TNG_v0.5_fastTest_subID_513105_sed_cube_obs_total.fits'
-    
-    filters = ['HST_F218W',   'CASTOR_UV',   'HST_F225W',   'HST_F275W',
-               'HST_F336W',   'CASTOR_U',    'HST_F390W',   'HST_F435W',
-               'CASTOR_G',    'HST_F475W',   'HST_F555W',   'HST_F606W',
-               'ROMAN_F062',  'HST_F625W',   'JWST_F070W',  'HST_F775W',
-               'HST_F814W',   'ROMAN_F087',  'JWST_F090W',  'HST_F850LP',
-               'HST_F105W',   'ROMAN_F106',  'HST_F110W',   'JWST_F115W',
-               'HST_F125W',   'ROMAN_F129',  'HST_F140W',   'ROMAN_F146',
-               'JWST_F150W',  'HST_F160W',   'ROMAN_F158',  'ROMAN_F184',
-               'JWST_F200W',  'ROMAN_F213',  'JWST_F277W',  'JWST_F356W',
-               'JWST_F410M',  'JWST_F444W'] # 'JWST_F560W',  'JWST_F770W',
-               # 'JWST_F1000W', 'JWST_F1130W', 'JWST_F1280W', 'JWST_F1500W',
-               # 'JWST_F1800W', 'JWST_F2100W', 'JWST_F2550W']
-    
-    # with h5py.File('SKIRT/SKIRT_cube_filters_and_waves_new.hdf5', 'w') as hf :
-    #     add_dataset(hf, np.arange(47), 'index')
-    #     add_dataset(hf, filters, 'filters', dtype=str)
-    #     add_dataset(hf, waves, 'waves')
-    
-    with fits.open(inDir + infile) as hdu :
-        # hdr = hdu[0].header
-        data = hdu[0].data*u.MJy/u.sr # 38, 491, 491
-        dim = data.shape
-        # waves_hdr = hdu[1].header
-        # waves = np.array(hdu[1].data.astype(float)) # effective wavelengths, in um
-    
-    # Re = 2.525036573410034*u.kpc
-    # size = 10*Re*cosmo.arcsec_per_kpc_comoving(0.0485236299818059)/pixel_scale
-    
-    # define the area of a pixel, based on CASTOR resolution after dithering
-    # pixel_scale = 0.05*u.arcsec/u.pix
-    area = 0.0025*u.arcsec**2
-    
-    image_r = np.full(dim[1:], 0.0)
-    for frame in data[20:] :
-        image_r += (frame*area).to(u.Jy).value
-    image_r = image_r/18
-    
-    image_g = np.full(dim[1:], 0.0)
-    for frame in data[7:20] :
-        image_g += (frame*area).to(u.Jy).value
-    image_g = image_g/13
-    
-    image_b = np.full(dim[1:], 0.0)
-    for frame in data[:7] :
-        image_b += (frame*area).to(u.Jy).value
-    image_b = image_b/7
-    
-    # image = make_lupton_rgb(image_r, image_g, image_b, Q=10, stretch=0.5)
-    # plt.imshow(image)
-    
-    # for frame in data :
-    #     m_AB = -2.5*np.log10(np.sum(frame*area).to(u.Jy)/(3631*u.Jy))
-    
-    return
-
-def parabola(xx, aa, bb, cc) :
-    return aa*np.square(xx) + bb*xx + cc
 
 def save_skirt_input(subIDfinal, snap, subID, Re, center, gas_setup='voronoi',
                      star_setup='mappings', save_gas=True, save_stars=True,
-                     save_ski=True, faceon_projection=False) :
+                     save_ski=True, model_redshift=0.5, fov=10,
+                     faceon_projection=False, no_medium=True) :
     
-    infile = 'F:/TNG50-1/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(snap, subID)
+    file = 'D:/Documents/GitHub/TNG/TNG50-1/TNG50-1_99_sample(t).hdf5'
+    infile = 'S:/Cam/University/GitHub/TNG/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(snap, subID)
     outDir = 'SKIRT/SKIRT_input_quenched/{}'.format(subIDfinal)
     outfile_gas = outDir + '/gas.txt'
     outfile_stars = outDir + '/stars.txt'
     outfile_oldstars = outDir + '/oldstars.txt'
     outfile_youngstars = outDir + '/youngstars.txt'
-    outfile_ski = outDir + '/{}.ski'.format(subIDfinal)
+    outfile_ski = outDir + '/{}_z_{:03}.ski'.format(
+        subIDfinal, str(model_redshift).replace('.', ''))
+    outfile_NoMedium = outDir + '/{}_z_{:03}_NoMedium.ski'.format(subIDfinal,
+        str(model_redshift).replace('.', ''))
     
     # create the output directory if it doesn't exist
     makedirs(outDir, exist_ok=True)
     
-    with h5py.File('TNG50-1/TNG50-1_99_sample(t).hdf5', 'r') as hf :
-        redshift = hf['redshifts'][snap]
+    # attach units to the effective radius
+    Re = Re*u.kpc
     
-    with h5py.File(infile, 'r') as hf :
-        gas_coords = hf['PartType0/Coordinates'][:]
-        Mgas = hf['PartType0/Masses'][:]*1e10/cosmo.h # in units of solMass
-        Zgas = hf['PartType0/GFM_Metallicity'][:]
-        gas_sfrs = hf['PartType0/StarFormationRate'][:]
-        uu = hf['PartType0/InternalEnergy'][:]
-        x_e = hf['PartType0/ElectronAbundance'][:]
-        rho_gas = hf['PartType0/Density'][:]
+    if save_ski : # save the SKIRT configuration file for processing
         
-        star_coords = hf['PartType4/Coordinates'][:]
-        stellarHsml = hf['PartType4/StellarHsml'][:]
-        Mstar = hf['PartType4/GFM_InitialMass'][:]*1e10/cosmo.h # solMass
-        Zstar = hf['PartType4/GFM_Metallicity'][:]
+        # select the SKIRT configuration template file, based on the setup
+        # for gas and star particles
+        if (gas_setup == 'particle') and (star_setup == 'bc03') :
+            template_file = 'SKIRT/TNG_v0.7_particle_BC03.ski'
+        if (gas_setup == 'particle') and (star_setup == 'mappings') :
+            template_file = 'SKIRT/TNG_v0.8_particle_MAPPINGS.ski'
+        if (gas_setup == 'voronoi') and (star_setup == 'bc03') :
+            template_file = 'SKIRT/TNG_v0.9_voronoi_BC03.ski'
+        if (gas_setup == 'voronoi') and (star_setup == 'mappings') :
+            template_file = 'SKIRT/TNG_v1.0_voronoi_MAPPINGS.ski'
         
-        # formation times in units of scalefactor
-        formation_scalefactors = hf['PartType4/GFM_StellarFormationTime'][:]
+        # define basic properties of the SKIRT run, using the model_redshift
+        # above as the redshift of the model run
+        numPackets = int(1e8) # number of photon packets
+        distance = 0*u.Mpc
+        fdust = 0.2 # dust fraction
+        minX, maxX = -(fov/2*Re).to(u.pc), (fov/2*Re).to(u.pc) # extent of model space
+        
+        # define the FoV, and number of pixels for the redshift of interest
+        plate_scale = 0.05*u.arcsec/u.pix
+        nPix_raw = fov*Re*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale
+        nPix = np.ceil(nPix_raw).astype(int).value
+        if nPix % 2 == 0 : # ensure all images have an odd number of pixels,
+            nPix += 1      # so that a central pixel exists
+        
+        # for lower resolution instruments (GALEX, Euclid-NISP, WISE, Spitzer,
+        # Herschel), update the number of pixels as necessary (assuming a second
+        # pointing where dithering is completed, improving the native pixel
+        # scale by a factor of two)
+        plate_scales_lr = {'galex':0.75, 'euclid_nisp':0.15, 'wise':0.65,
+            'spitzer_irac':0.6, 'spitzer_24':1.25,  'spitzer_70':5,
+            'spitzer_160':8.5, 'herschel_pacs':1.6, 'herschel_160':3.2,
+            'herschel_250':3, 'herschel_350':5, 'herschel_500':7}
+        nPix_lrs = np.full(12, -1)
+        for i, plate_scale_lr in enumerate(plate_scales_lr.values()) :
+            plate_scale_lr *= u.arcsec/u.pix
+            nPix_lr_raw = fov*Re*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale_lr
+            nPix_lr = np.ceil(nPix_lr_raw).astype(int).value
+            if nPix_lr % 2 == 0 : # ensure images have an odd number of pixels,
+                nPix_lr += 1      # so that a central pixel exists
+            nPix_lrs[i] = nPix_lr
+        
+        # parse the template ski file
+        ski = ET.parse(template_file)
+        root = ski.getroot()
+        
+        # access attributes of the configuration and set basic properties
+        sim = root.findall('MonteCarloSimulation')[0]
+        sim.set('numPackets', str(numPackets))
+        sim.findall('cosmology')[0].findall('FlatUniverseCosmology')[0].set(
+            'redshift', str(model_redshift))
+        
+        # update medium attributes
+        medium = sim.findall('mediumSystem')[0].findall('MediumSystem')[0]
+        if gas_setup == 'particle' :
+            dust = medium.findall('media')[0].findall('ParticleMedium')[0]
+        if gas_setup == 'voronoi' :
+            dust = medium.findall('media')[0].findall('VoronoiMeshMedium')[0]
+            dust.set('minX', str(minX))
+            dust.set('maxX', str(maxX))
+            dust.set('minY', str(minX))
+            dust.set('maxY', str(maxX))
+            dust.set('minZ', str(minX))
+            dust.set('maxZ', str(maxX))
+        dust.set('massFraction', str(fdust))
+        grid = medium.findall('grid')[0].findall('PolicyTreeSpatialGrid')[0]
+        grid.set('minX', str(minX))
+        grid.set('maxX', str(maxX))
+        grid.set('minY', str(minX))
+        grid.set('maxY', str(maxX))
+        grid.set('minZ', str(minX))
+        grid.set('maxZ', str(maxX))
+        
+        # update instrument attributes
+        instruments = sim.findall('instrumentSystem')[0].findall(
+            'InstrumentSystem')[0].findall('instruments')[0]
+        for instrument in instruments[:10] :
+            instrument.set('fieldOfViewX', str(fov*Re))
+            instrument.set('fieldOfViewY', str(fov*Re))
+            instrument.set('distance', str(distance))
+            instrument.set('numPixelsX', str(nPix))
+            instrument.set('numPixelsY', str(nPix))
+        # update low-resolution instrument attributes
+        for instrument, nPix_lr in zip(instruments[10:], nPix_lrs) :
+            instrument.set('fieldOfViewX', str(fov*Re))
+            instrument.set('fieldOfViewY', str(fov*Re))
+            instrument.set('distance', str(distance))
+            instrument.set('numPixelsX', str(nPix_lr))
+            instrument.set('numPixelsY', str(nPix_lr))
+        
+        # write the configuration file to disk
+        ski.write(outfile_ski, encoding='UTF-8', xml_declaration=True)
+        
+        if no_medium : # save a modified SKIRT configuration file, without dust
+                       # for checking Av input values for FAST++ fitting
+            nodust = ski # copy the ski parameter file from above
+            root = nodust.getroot()
+            
+            # set the simulation mode
+            sim = root.findall('MonteCarloSimulation')[0]
+            sim.set('simulationMode', 'NoMedium')
+            
+            # remove the medium system as there is no medium
+            sim.remove(sim.findall('mediumSystem')[0])
+            
+            # get all the instruments
+            system = sim.findall('instrumentSystem')[0].findall(
+                'InstrumentSystem')[0]
+            instruments = system.findall('instruments')[0]
+            
+            # remove the unnecessary instruments
+            for instrument in instruments[:4]+instruments[5:]:
+                instruments.remove(instrument)
+            
+            # rename the remaining instrument
+            instruments[0].set('instrumentName', 'Av_raw')
+            
+            # write the configuration file to disk
+            nodust.write(outfile_NoMedium, encoding='UTF-8', xml_declaration=True)
     
-    # formation times in units of age of the universe (ie. cosmic time)
-    formation_times = cosmo.age(1/formation_scalefactors - 1).value
-    
-    # calculate the rotation matrix to project the galaxy face on
-    if faceon_projection :
-        rot = rotation_matrix_from_MoI_tensor(calculate_MoI_tensor(
-            Mgas, gas_sfrs, gas_coords, formation_times, Mstar, star_coords,
-            Re, center))
-        g_dx, g_dy, g_dz = np.matmul(np.asarray(rot['face-on']),
-                                     (gas_coords-center).T)
-        s_dx, s_dy, s_dz = np.matmul(np.asarray(rot['face-on']),
-                                     (star_coords-center).T)
-    else :
-        # don't project the galaxy face-on
-        g_dx, g_dy, g_dz = (gas_coords - center).T
-        s_dx, s_dy, s_dz = (star_coords - center).T
+    if save_gas or save_stars :
+        with h5py.File(file, 'r') as hf :
+            redshift = hf['redshifts'][snap]
+        
+        with h5py.File(infile, 'r') as hf :
+            gas_coords = hf['PartType0/Coordinates'][:]
+            Mgas = hf['PartType0/Masses'][:]*1e10/cosmo.h # in units of solMass
+            Zgas = hf['PartType0/GFM_Metallicity'][:]
+            gas_sfrs = hf['PartType0/StarFormationRate'][:]
+            uu = hf['PartType0/InternalEnergy'][:]
+            x_e = hf['PartType0/ElectronAbundance'][:]
+            rho_gas = hf['PartType0/Density'][:]
+            
+            star_coords = hf['PartType4/Coordinates'][:]
+            stellarHsml = hf['PartType4/StellarHsml'][:]
+            Mstar = hf['PartType4/GFM_InitialMass'][:]*1e10/cosmo.h # solMass
+            Zstar = hf['PartType4/GFM_Metallicity'][:]
+            
+            # formation times in units of scalefactor
+            formation_scalefactors = hf['PartType4/GFM_StellarFormationTime'][:]
+        
+        # formation times in units of age of the universe (ie. cosmic time)
+        formation_times = cosmo.age(1/formation_scalefactors - 1).value
+        
+        # calculate the rotation matrix to project the galaxy face on
+        if faceon_projection :
+            rot = rotation_matrix_from_MoI_tensor(calculate_MoI_tensor(
+                Mgas, gas_sfrs, gas_coords, formation_times, Mstar, star_coords,
+                Re, center))
+            g_dx, g_dy, g_dz = np.matmul(np.asarray(rot['face-on']),
+                                         (gas_coords-center).T)
+            s_dx, s_dy, s_dz = np.matmul(np.asarray(rot['face-on']),
+                                         (star_coords-center).T)
+        else :
+            # don't project the galaxy face-on
+            g_dx, g_dy, g_dz = (gas_coords - center).T
+            s_dx, s_dy, s_dz = (star_coords - center).T
     
     if save_gas : # save the input for the gas particles
         
@@ -394,76 +435,35 @@ def save_skirt_input(subIDfinal, snap, subID, Re, center, gas_setup='voronoi',
             np.savetxt(outfile_youngstars, youngstars, delimiter=' ',
                        header=ys_hdr)
     
-    if save_ski : # save the SKIRT configuration file for processing
-        
-        # select the SKIRT configuration template file, based on the setup
-        # for gas and star particles
-        if (gas_setup == 'particle') and (star_setup == 'bc03') :
-            template_file = 'SKIRT/TNG_v0.7_particle_BC03.ski'
-        if (gas_setup == 'particle') and (star_setup == 'mappings') :
-            template_file = 'SKIRT/TNG_v0.8_particle_MAPPINGS.ski'
-        if (gas_setup == 'voronoi') and (star_setup == 'bc03') :
-            template_file = 'SKIRT/TNG_v0.9_voronoi_BC03.ski'
-        if (gas_setup == 'voronoi') and (star_setup == 'mappings') :
-            template_file = 'SKIRT/TNG_v1.0_voronoi_MAPPINGS.ski'
-        
-        # define basic properties of the SKIRT run
-        numPackets = int(1e8) # number of photon packets
-        model_redshift = 0.5 # the redshift of the model run
-        distance = 0*u.Mpc
-        fdust = 0.2 # dust fraction
-        minX, maxX = -10*Re.to(u.pc), 10*Re.to(u.pc) # extent of model space
-        
-        # define the FoV, and number of pixels for the redshift of interest
-        plate_scale = 0.05*u.arcsec/u.pix
-        fov = 20*Re
-        nPix_raw = fov*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale
-        nPix = np.ceil(nPix_raw).astype(int).value
-        
-        # parse the template ski file
-        ski = ET.parse(template_file)
-        root = ski.getroot()
-        
-        # access attributes of the configuration and set basic properties
-        sim = root.findall('MonteCarloSimulation')[0]
-        sim.set('numPackets', str(numPackets))
-        sim.findall('cosmology')[0].findall('FlatUniverseCosmology')[0].set(
-            'redshift', str(model_redshift))
-        
-        # update medium attributes
-        medium = sim.findall('mediumSystem')[0].findall('MediumSystem')[0]
-        if gas_setup == 'particle' :
-            dust = medium.findall('media')[0].findall('ParticleMedium')[0]
-        if gas_setup == 'voronoi' :
-            dust = medium.findall('media')[0].findall('VoronoiMeshMedium')[0]
-            dust.set('minX', str(minX))
-            dust.set('maxX', str(maxX))
-            dust.set('minY', str(minX))
-            dust.set('maxY', str(maxX))
-            dust.set('minZ', str(minX))
-            dust.set('maxZ', str(maxX))
-        dust.set('massFraction', str(fdust))
-        grid = medium.findall('grid')[0].findall('PolicyTreeSpatialGrid')[0]
-        grid.set('minX', str(minX))
-        grid.set('maxX', str(maxX))
-        grid.set('minY', str(minX))
-        grid.set('maxY', str(maxX))
-        grid.set('minZ', str(minX))
-        grid.set('maxZ', str(maxX))
-        
-        # update instrument attributes
-        instruments = sim.findall('instrumentSystem')[0].findall(
-            'InstrumentSystem')[0].findall('instruments')[0]
-        for instrument in instruments :
-            instrument.set('fieldOfViewX', str(fov))
-            instrument.set('fieldOfViewY', str(fov))
-            instrument.set('distance', str(distance))
-            instrument.set('numPixelsX', str(nPix))
-            instrument.set('numPixelsY', str(nPix))
-        
-        # write the configuration file to disk
-        ski.write(outfile_ski, encoding='UTF-8', xml_declaration=True)
-    
     print('{} done'.format(subIDfinal))
     
     return
+
+'''
+table = Table.read('tools/subIDs.fits')
+mask = (table['mech'] == 1) | (table['mech'] == 3)
+
+for subID in table[mask]['subID'].data[-1:] :
+    infile = 'skirt/SKIRT_input_quenched/{}/gas.txt'.format(subID)
+    _, _, _, Mgas, Zgas = np.loadtxt(infile, unpack=True)
+    
+    twelvePluslogOH = np.log10(Zgas/0.0127) + 8.69
+    
+    logDTG = np.where(twelvePluslogOH <= 8.1, 3.1*np.log10(Zgas/0.0127) - 0.96,
+                      np.log10(Zgas/0.0127) - 2.21)
+    
+    Mdust_frac = 0.2*Zgas # from Trcka+2022 and others, usual perscription
+    Mdust_frac_alt = np.power(10, logDTG) # from Remy-Ruyer+2014, also in Bottrell+2024
+    
+    print(np.sort(Mdust_frac_alt/Mdust_frac)[:1000])
+'''
+
+# from GALEXEV_pipeline
+# https://github.com/vrodgom/galaxev_pipeline/blob/master/galaxev_pipeline/create_images.py#L135-L156
+# from scipy.spatial import KDTree
+# pos = np.loadtxt('SKIRT/SKIRT_input_quenched/96795/oldstars.txt')[:, :3]
+# posyoung = np.loadtxt('SKIRT/SKIRT_input_quenched/96795/youngstars.txt')[:, :3]
+# pos = np.vstack((pos, posyoung))
+# tree = KDTree(pos)
+# res = tree.query(pos, k=32 + 1)
+# hsml = res[0][:, -1]

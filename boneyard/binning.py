@@ -18,9 +18,9 @@ def bin_all(population='quenched', detection_filter='roman_f184') :
     os.makedirs(outDir, exist_ok=True) # ensure the output directory for the
         # bins is available
     
-    # table = Table.read('tools/subIDs.fits')
-    # subIDs = table['subIDs'].data
-    subIDs = [63871, 96771, 198186] # for testing
+    table = Table.read('tools/subIDs.fits')
+    subIDs = table['subIDs'].data
+    # subIDs = [63871, 96771, 198186] # for testing
     
     for subID in subIDs :
         (annuli_map, smas, smbs, fluxes, errs, nPixels, widths,
@@ -28,7 +28,7 @@ def bin_all(population='quenched', detection_filter='roman_f184') :
         
         outfile = outDir + 'subID_{}_annuli.npz'.format(subID)
         np.savez(outfile, image=annuli_map, sma=smas, smb=smbs, flux=fluxes,
-                 err=errs, nPixels=nPixels, width=widths, pa=pas)
+                  err=errs, nPixels=nPixels, width=widths, pa=pas)
     
     return
 
@@ -58,6 +58,8 @@ def annuli_bins(subID, population='quenched', detection_filter='roman_f184',
     # open the SourceXtractorPlusPlus-derived catalog file for morphological
     # measurements
     catalog = Table.read(seppDir + 'cat.fits')
+    catalog.sort('area') # sort the table according to largest area, for cases
+    catalog.reverse()    # where there is more than one source
     detID = catalog['group_id'].data[0]
     # sma = catalog['ellipse_a'].data[0]
     # smb = catalog['ellipse_b'].data[0]
@@ -93,7 +95,7 @@ def annuli_bins(subID, population='quenched', detection_filter='roman_f184',
         flux, err, rnew, width, annulus, nPixels = compute_annuli(new_sci,
             new_noise, shape, (x0, y0), rin, dr, eta, pa, targetSNR)
         
-        if continue_growing(annulus, dim) :
+        if not np.isnan(rnew) and continue_growing(annulus, dim) :
             fluxes.append(flux)
             errs.append(err)
             rins.append(rnew)
@@ -101,6 +103,8 @@ def annuli_bins(subID, population='quenched', detection_filter='roman_f184',
             annuli.append(annulus)
             nPixels_list.append(nPixels)
         rin = rnew
+        if np.isnan(rnew) : # if a recursion error is obtained, break the loop
+            break
     
     # create the annuli map for subsequent determination of photometric fluxes
     annuli_map = np.zeros(shape)
@@ -108,7 +112,7 @@ def annuli_bins(subID, population='quenched', detection_filter='roman_f184',
         annuli_map += (i+1)*annuli[i]
     annuli_map[annuli_map == 0] = np.nan
     annuli_map -= 1
-    plt.display_image_simple(annuli_map, lognorm=False)
+    # plt.display_image_simple(annuli_map, lognorm=False)
     
     smas = np.array(rins) # the semi-major axes of the inner annuli
     smbs = (1 - eta)*smas # the semi-minor axes of the inner annuli
@@ -173,3 +177,7 @@ def elliptical_mask(dim, xy, rin, eta, pa) :
     mask = ellipse <= 1
     
     return mask
+
+# for subID in [1] : #, 63871, 96771, 198186] :
+#     bin_data = np.load('bins/quenched/subID_{}_annuli.npz'.format(subID))
+#     plt.display_image_simple(bin_data['image'], lognorm=False)

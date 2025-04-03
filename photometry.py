@@ -1,176 +1,208 @@
 
 import os
-import glob
 import numpy as np
 
+from astropy.cosmology import FlatLambdaCDM
+from astropy.io import fits
 from astropy.table import Table, vstack
 import astropy.units as u
+from photutils.aperture import CircularAnnulus, CircularAperture
 
-from core import open_cutout
+from core import load_massive_galaxy_sample
 
-def all_fluxes(survey='all', population='quenched') :
+cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
+
+def determine_all_photometry() :
     
-    outDir = 'photometry/{}/'.format(population)
+    # get the entire massive sample, including both quenched galaxies and
+    # comparison/control star forming galaxies
+    sample = load_massive_galaxy_sample()
     
-    os.makedirs(outDir, exist_ok=True) # ensure the output directory for the
-        # photometric tables is available
+    # select only the quenched galaxies at the first snapshot >=75% of the way
+    # through their quenching episodes
+    mask = (((sample['mechanism'] == 1) | (sample['mechanism'] == 3)) &
+        (sample['episode_progress'] >= 0.75))
+    sample = sample[mask]
     
-    # table = Table.read('tools/subIDs.fits')
-    # subIDs = table['subIDs'].data
-    subIDs = [63871, 96771, 198186] # for testing
+    # use the first snapshot >=75% of the way through the quenching episode,
+    # but not any additional snapshots, for testing purposes
+    mask = np.full(len(sample), False)
+    idx = 0
+    for subIDfinal in np.unique(sample['subIDfinal']) :
+        mask[idx] = True
+        idx += len(np.where(sample['subIDfinal'] == subIDfinal)[0])
+    sample = sample[mask]
     
-    filters = get_filters(survey)
-    
-    for subID in subIDs :
-        determine_fluxes(subID, filters, population=population)
+    # process every galaxy/snapshot pair
+    for subID, snap, Re in zip(sample['subID'], sample['snapshot'], sample['Re']) :
+        outfile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
+        if not os.path.exists(outfile) :
+            determine_photometry_circular_annuli(snap, subID, Re)
+        print('snap {} subID {} done'.format(snap, subID))
     
     return
 
-def determine_fluxes(subID, filters, population='quenched') :
+def determine_photometry_circular_annuli(snap, subID, Re, model_redshift=0.5,
+                                         fov=10, save=True) :
     
-    binsDir = 'bins/{}/'.format(population)
-    cutoutDir = 'cutouts/{}/{}/'.format(population, subID)
-    outDir = 'photometry/{}/'.format(population)
-    seppDir = 'detection/{}/{}/'.format(population, subID)
+    # open the input image
+    infile = 'cutouts/{}_{}_z_{:03}.fits'.format(snap, subID,
+        str(model_redshift).replace('.', ''))
+    with fits.open(infile) as hdu :
+        hdr = hdu[0].header
+        images = hdu[0].data*u.Jy # Jy [per pixel]
+    plate_scale = hdr['CDELT1']*u.arcsec/u.pix # the plate scale of the images
+    assert hdr['REDSHIFT'] == model_redshift
     
-    infile = binsDir + 'subID_{}_annuli.npz'.format(subID)
-    outfile = outDir + 'subID_{}_photometry.fits'.format(subID)
+    # get the filters
+    filters = [hdr['FILTER{}'.format(i)] for i in range(len(hdr['FILTER*']))]
     
-    # load the elliptical annuli bins data
-    bin_data = np.load(infile)
+    # determine the center of the image
+    cent = int((images.shape[1] - 1)/2)
+    center = (cent, cent)
     
-    bins_image = bin_data['image']
-    sma, smb = bin_data['sma'], bin_data['smb']
-    flux, err = bin_data['flux'], bin_data['err']
-    nPixels = bin_data['nPixels']
-    widths, PAs = bin_data['width'], bin_data['pa']
+    # convert Re, 1 kpc into pixels
+    Re_pix = (Re*u.kpc*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale).value
+    kpc_pix = (1*u.kpc*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale).value
     
-    numBins = int(np.nanmax(bins_image) + 1) # accounts for python 0-index
+    # get the edges of the circular annuli in units of pixels for masking
+    edges_pix = np.linspace(0, 5, 21)*Re_pix # edges in units of Re
     
-    if not np.isnan(numBins) :
-        photometry = Table()
-        photometry['bin'] = range(numBins)
-        photometry['sma'], photometry['smb'] = sma, smb
-        photometry['flux'], photometry['err'] = flux, err
-        photometry['SN'], photometry['nPixels'] = flux/err, nPixels
-        photometry['width'], photometry['PA'] = widths, PAs
+    # add the photometry for every annulus and every filter into a table
+    photometry = Table()
+    nPixel_profile = np.full(22, -1.0)
+    for i, filt in enumerate(filters) :
+        # open the science images and the corresponding noise images
+        sci = images[2*i]
+        noise = images[2*i + 1]
         
-        # get the SourceXtractorPlusPlus-derived segmentation map
-        segmap_file = seppDir + 'segmap.fits'
-        segMap, _ = open_cutout(segmap_file, simple=True)
+        signal_profile = np.full(22, -99.)*u.Jy
+        noise_profile = np.full(22, -99.)*u.Jy
+        for i, (start, end) in enumerate(zip(edges_pix, edges_pix[1:])) :
+            # dist = calculate_distance_to_center((data.shape[1], data.shape[2]))
+            # if end == edges_pix[-1] :
+            #     mask = (dist >= start) & (dist <= end)
+            # else :
+            #     mask = (dist >= start) & (dist < end)
+            # signal_profile[i] = np.sum(sci[mask])
+            # noise_profile[i] = np.sqrt(np.sum(np.square(noise[mask])))
+            # determine the number of pixels for the pixelized TNG profiles
+            # nPixel_profile[i] = np.sum(mask)
+            
+            if start == 0 :
+                ap = CircularAperture(center, end)
+            else :
+                ap = CircularAnnulus(center, start, end)
+            flux, err = ap.do_photometry(sci, noise)
+            
+            signal_profile[i] = flux[0]
+            noise_profile[i] = err[0]
+            nPixel_profile[i] = ap.area # the pixel areas per annulus
         
-        # open the SourceXtractorPlusPlus-derived catalog file
-        catalog = Table.read(seppDir + 'cat.fits')
-        detID = catalog['group_id'].data[0]
-        r_e = catalog['flux_radius'].data[0] # [pix] the half flux radius
+        # complete an additional inner 1 kpc aperture
+        inner_kpc = CircularAperture(center, kpc_pix)
+        inner_kpc_flux, inner_kpc_err = inner_kpc.do_photometry(sci, noise)
+        signal_profile[20] = inner_kpc_flux[0]
+        noise_profile[20] = inner_kpc_err[0]
+        nPixel_profile[20] = inner_kpc.area
         
-        for filt in filters :
-            
-            # open the science images and the corresponding noise images
-            sci_file, noise_file = glob.glob(cutoutDir + filt + '_*.fits')
-            
-            sci, _, redshift, exptime, area, photfnu, scale = open_cutout(sci_file)
-            noise, _ = open_cutout(noise_file, simple=True)
-            
-            # make a copy of the science image and noise image
-            new_sci = sci.copy()
-            new_noise = noise.copy()
-            
-            # mask the copied images based on the segmentation map, but don't
-            # mask out the sky -> mask out pixels associated with other galaxies
-            new_sci[(segMap > 0) & (segMap != detID)] = 0
-            new_noise[(segMap > 0) & (segMap != detID)] = 0
-            
-            # save extraneous information into the table
-            length = len(range(numBins))
-            photometry['R_e'] = [r_e]*length*u.pix
-            photometry['z'] = [redshift]*length
-            photometry['scale'] = [scale]*length
-            
-            fluxes, uncerts, invalid = [], [], []
-            for val in range(numBins) :
-                temp_sci, temp_noise = new_sci.copy(), new_noise.copy()
-                
-                temp_sci[bins_image != val] = np.nan
-                flux_sum = np.nansum(temp_sci)
-                flux = flux_sum/exptime/area*photfnu
-                fluxes.append(flux)
-                
-                temp_noise[bins_image != val] = np.nan
-                noise_sum = np.sqrt(np.nansum(np.square(temp_noise)))
-                uncert = noise_sum/exptime/area*photfnu
-                uncerts.append(uncert)
-                
-                pix_sci = temp_sci.copy()
-                pix_sci[pix_sci != 0] = np.nan
-                pix_sci[pix_sci == 0] = 1
-                invalid_pix = np.nansum(pix_sci)
-                invalid.append(invalid_pix)
-            
-            photometry[filt + '_flux'] = fluxes*u.Jy
-            photometry[filt + '_err'] = uncerts*u.Jy
-            
-            valid = nPixels - np.array(invalid)
-            photometry[filt + '_nPix'] = np.int_(valid)
+        # complete an additional integrated aperture out to 5 Re
+        integrated_ap = CircularAperture(center, edges_pix[-1])
+        int_flux, int_err = integrated_ap.do_photometry(sci, noise)
+        signal_profile[21] = int_flux[0]
+        noise_profile[21] = int_err[0]
+        nPixel_profile[21] = integrated_ap.area
         
+        # add the filter profiles into the photometry table
+        photometry[filt + '_flux'] = signal_profile
+        photometry[filt + '_err'] = noise_profile
+        # photometry[filt + '_flux'] = sci.flatten()/exptime/area*photfnu*u.Jy
+        # photometry[filt + '_err'] = noise.flatten()/exptime/area*photfnu*u.Jy
+    
+    # make unique IDs for each annulus
+    pixel = ['{}_{}_bin_{}'.format(snap, subID, i) for i in np.arange(len(photometry))]
+    # pixel = np.arange(len(photometry))
+    
+    # correct the final IDs
+    pixel[20] = '{}_{}_bin_kpc'.format(snap, subID)
+    pixel[21] = '{}_{}_bin_int'.format(snap, subID)
+    
+    # add the IDs to the photometric table, at the beginning of the table
+    photometry.add_column(pixel, name='id', index=0)
+    
+    # add the number of pixels per bin into the table
+    photometry['nPix'] = nPixel_profile
+    
+    # add the redshift into the table
+    photometry['z_spec'] = np.full_like(pixel, model_redshift)
+    
+    # sort the table according to distance from the center of the image
+    # sort = np.argsort(photometry['distance'].data)
+    # photometry = photometry[sort]
+    
+    # mask the photometry table to those pixels within 5 Re
+    # mask = (photometry['distance'].data <= fov/2*Re_pix)
+    # photometry = photometry[mask]
+    
+    if save :
+        os.makedirs('photometry/', exist_ok=True) # ensure the output directory
+            # for the photometric tables is available
+        
+        outfile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
         photometry.write(outfile)
     
     return
 
-def get_filters(survey) :
+def join_all_photometry(model_redshift=0.5, save=True) :
     
-    castor = ['castor_uv', 'castor_u', 'castor_g']
-    hst = ['hst_f218w', 'hst_f225w', 'hst_f275w', 'hst_f336w', 'hst_f390w',
-           'hst_f438w', 'hst_f435w', 'hst_f475w', 'hst_f555w', 'hst_f606w',
-           'hst_f625w', 'hst_f775w', 'hst_f814w', 'hst_f850lp', 'hst_f105w',
-           'hst_f110w', 'hst_f125w', 'hst_f140w', 'hst_f160w']
-    jwst = ['jwst_f070w', 'jwst_f090w', 'jwst_f115w', 'jwst_f150w', 'jwst_f200w',
-            'jwst_f277w', 'jwst_f356w', 'jwst_f410m', 'jwst_f444w']
-    roman = ['roman_f062', 'roman_f087', 'roman_f106', 'roman_f129',
-             'roman_f146', 'roman_f158', 'roman_f184', 'roman_f213']
+    # set a dictionary to translate the filter names to FAST++-compliant names
+    translate = {'castor_uv':'F314', 'castor_uvL':'F315', 'castor_uS':'F316',
+                 'castor_u':'F317', 'castor_g':'F318',
+                 
+                 'euclid_ie':'F319', 'euclid_ye':'F320', 'euclid_je':'F321',
+                 'euclid_he':'F322',
+                 
+                 'hst_f218w':'F323', 'hst_f225w':'F324', 'hst_f275w':'F325', 
+                 'hst_f336w':'F326', 'hst_f390w':'F327', 'hst_f438w':'F328',
+                 'hst_f435w':'F329', 'hst_f475w':'F330', 'hst_f555w':'F331',
+                 'hst_f606w':'F332', 'hst_f625w':'F333', 'hst_f775w':'F334',
+                 'hst_f814w':'F335', 'hst_f850lp':'F336', 'hst_f105w':'F337',
+                 'hst_f110w':'F338', 'hst_f125w':'F339', 'hst_f140w':'F340',
+                 'hst_f160w':'F341',
+                 
+                 'jwst_f070w':'F342', 'jwst_f090w':'F343', 'jwst_f115w':'F344',
+                 'jwst_f150w':'F345', 'jwst_f200w':'F346', 'jwst_f277w':'F347',
+                 'jwst_f356w':'F348', 'jwst_f410m':'F349', 'jwst_f444w':'F350',
+                 'jwst_f560w':'F351', 'jwst_f770w':'F352', 'jwst_f1000w':'F353',
+                 'jwst_f1130w':'F354', 'jwst_f1280w':'F355', 'jwst_f1500w':'F356',
+                 'jwst_f1800w':'F357', 'jwst_f2100w':'F358', 'jwst_f2550w':'F359',
+                 
+                 'roman_f062':'F360', 'roman_f087':'F361', 'roman_f106':'F362',
+                 'roman_f129':'F363', 'roman_f146':'F364', 'roman_f158':'F365',
+                 'roman_f184':'F366', 'roman_f213':'F367'}
     
-    if survey == 'all' :
-        filters = castor + hst + jwst + roman
+    # get the entire massive sample, including both quenched galaxies and
+    # comparison/control star forming galaxies
+    sample = load_massive_galaxy_sample()
     
-    if survey == 'castor_roman' :
-        filters = castor + roman
+    # select only the quenched galaxies at the first snapshot >=75% of the way
+    # through their quenching episodes
+    mask = (((sample['mechanism'] == 1) | (sample['mechanism'] == 3)) &
+        (sample['episode_progress'] >= 0.75))
+    sample = sample[mask]
     
-    if survey == 'hst_jwst' :
-        filters = hst + jwst
+    # use the first snapshot >=75% of the way through the quenching episode,
+    # but not any additional snapshots, for testing purposes
+    mask = np.full(len(sample), False)
+    idx = 0
+    for subIDfinal in np.unique(sample['subIDfinal']) :
+        mask[idx] = True
+        idx += len(np.where(sample['subIDfinal'] == subIDfinal)[0])
+    sample = sample[mask]
     
-    return filters
-
-def join_all_photometry(survey='castor_roman', hlwas=True, population='quenched') :
-    
-    inDir = 'photometry/{}/'.format(population)
-    outfile = 'photometry/photometry.cat'
-    
-    # table = Table.read('tools/subIDs.fits')
-    # subIDs = table['subIDs'].data
-    subIDs = [96771] #[63871, 96771, 198186] # for testing
-    
-    filters = get_filters(survey)
-    if hlwas :
-        filters = filters[:3] + ['roman_f106', 'roman_f129', 'roman_f158',
-                                 'roman_f184']
-    
-    translate = {'castor_uv':'F314', 'castor_u':'F315', 'castor_g':'F316',
-                 'hst_f218w':'F317', 'hst_f225w':'F318', 'hst_f275w':'F319', 
-                 'hst_f336w':'F320', 'hst_f390w':'F321', 'hst_f438w':'F322',
-                 'hst_f435w':'F323', 'hst_f475w':'F324', 'hst_f555w':'F325',
-                 'hst_f606w':'F326', 'hst_f625w':'F327', 'hst_f775w':'F328',
-                 'hst_f814w':'F329', 'hst_f850lp':'F330', 'hst_f105w':'F331',
-                 'hst_f110w':'F332', 'hst_f125w':'F333', 'hst_f140w':'F334',
-                 'hst_f160w':'F335',
-                 'jwst_f070w':'F336', 'jwst_f090w':'F337', 'jwst_f115w':'F338',
-                 'jwst_f150w':'F339', 'jwst_f200w':'F340', 'jwst_f277w':'F341',
-                 'jwst_f356w':'F342', 'jwst_f410m':'F343', 'jwst_f444w':'F344',
-                 'jwst_f560w':'F345', 'jwst_f770w':'F346', 'jwst_f1000w':'F347',
-                 'jwst_f1130w':'F348', 'jwst_f1280w':'F349', 'jwst_f1500w':'F350',
-                 'jwst_f1800w':'F351', 'jwst_f2100w':'F352', 'jwst_f2550w':'F353',
-                 'roman_f062':'F354', 'roman_f087':'F355', 'roman_f106':'F356',
-                 'roman_f129':'F357', 'roman_f146':'F358', 'roman_f158':'F359',
-                 'roman_f184':'F360', 'roman_f213':'F361'}
+    # define the filters that we want to create images for
+    filters = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g',
+               'roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
     
     # determine the names that will be used in the final photometric table
     names = ['id']
@@ -179,31 +211,34 @@ def join_all_photometry(survey='castor_roman', hlwas=True, population='quenched'
         names.append(translate[filt].replace('F', 'E'))
     names.append('z_spec')
     
-    # loop over all the galaxies in the sample
-    tables_to_stack =[]
-    for subID in subIDs :
+    # process every galaxy/snapshot pair
+    tables_to_stack = []
+    for subID, snap in zip(sample['subID'], sample['snapshot']) :
         # get the photometry for an individual galaxy
-        infile = inDir + 'subID_{}_photometry.fits'.format(subID)
+        infile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
         table = Table.read(infile)
         
-        # get unique identifications for each elliptical annulus
-        bins = [str(subID) + '_bin_' + str(binNum) for binNum in table['bin'].data]
-        # bins = [str(subID) + '_run_' + str(i) + '_bin_' + str(binNum)
-        #         for binNum in table['bin'].data]
-        
         # get photometry from the table, and include additional redshift info
-        columns = [bins]
+        columns = [table['id']]
         for filt in filters :
             columns.append(table[filt + '_flux'].data)
             columns.append(table[filt + '_err'].data)
-        columns.append(table['z'])
+        columns.append(table['z_spec'].data)
         
-        # construct a new table
-        new = Table(columns, names=names)
-        tables_to_stack.append(new)
+        # append the translated table to the list of tables to stack
+        tables_to_stack.append(Table(columns, names=names))
     
     # stack the photometry, thereby creating a master table of photometry to fit
     final = vstack(tables_to_stack)
-    final.write(outfile, format='ascii.commented_header')
+    
+    # save only the integrated apertures
+    # ids = np.stack(np.char.split(
+    #     np.array(final['id'].value, dtype=str), sep='_').ravel())[:, 2]
+    # final = final[ids == 'int']
+    
+    if save :
+        outfile = 'photometry/photometry_2April2025.cat'
+        if not os.path.exists(outfile) :
+            final.write(outfile, format='ascii.commented_header')
     
     return

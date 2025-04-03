@@ -8,7 +8,7 @@ import h5py
 from scipy.ndimage import gaussian_filter
 
 # from CASTOR_proposal import spatial_plot_info
-from noise import add_noise_and_psf
+from cutouts import add_noise_and_psf
 import plotting as plt
 
 def compare_raw_to_SKIRT(subIDfinal, snap, subID, Re, center) :
@@ -115,9 +115,9 @@ def compare_raw_to_SKIRT(subIDfinal, snap, subID, Re, center) :
         skirt_vmax=skirt_vmax, pro_vmin=pro_vmin, pro_vmax=pro_vmax,
         xlabel=r'$\Delta x$ ($R_{\rm e}$)', ylabel=r'$\Delta y$ ($R_{\rm e}$)',
         mtitle=r'subID$_{z = 0}$' + ' {}'.format(subIDfinal), xmin=-5, xmax=5,
-        ymin=-5, ymax=5, save=True, outfile=outDir + '{}.png'.format(subIDfinal))
+        ymin=-5, ymax=5, save=False, outfile=outDir + '{}.png'.format(subIDfinal))
     
     return
 
 # compare_raw_to_SKIRT(96771, 44, 42759, 0.825415849685669,
-#                      [28307.04296875, 7637.23876953125, 4297.02587890625])
+#                       [28307.04296875, 7637.23876953125, 4297.02587890625])

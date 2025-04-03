@@ -3,28 +3,32 @@ import numpy as np
 
 from astropy.table import Table
 import astropy.units as u
-# from pandeia.engine.instrument_factory import InstrumentFactory
-# import stsynphot as stsyn
-
-import plotting as plt
 
 def calculate_pivots_and_fwhm() :
     
-    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
+    filters = ['castor_uv',    'castor_uvL',   'castor_uS',    'castor_u',
                'castor_g',
-               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
-               'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
-               'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
-               'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
-               'hst_f814w',   'hst_f850lp',  'hst_f105w',   'hst_f110w',
-               'hst_f125w',   'hst_f140w',   'hst_f160w',
-               'jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
-               'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
-               'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
-               'jwst_f1130w', 'jwst_f1280w', 'jwst_f1500w', 'jwst_f1800w',
-               'jwst_f2100w', 'jwst_f2550w',
-               'roman_f062',  'roman_f087',  'roman_f106',  'roman_f129',
-               'roman_f146',  'roman_f158',  'roman_f184',  'roman_f213']
+               'euclid_ie',    'euclid_ye',    'euclid_je',    'euclid_he',
+               # 'galex_fuv',    'galex_nuv',
+               # 'herschel_70',  'herschel_100', 'herschel_160',
+               # 'herschel_250', 'herschel_350', 'herschel_500',
+               'hst_f218w',    'hst_f225w',    'hst_f275w',    'hst_f336w',
+               'hst_f390w',    'hst_f438w',    'hst_f435w',    'hst_f475w',
+               'hst_f555w',    'hst_f606w',    'hst_f625w',    'hst_f775w',
+               'hst_f814w',    'hst_f850lp',   'hst_f105w',    'hst_f110w',
+               'hst_f125w',    'hst_f140w',    'hst_f160w',
+               # 'johnson_v',    'johnson_v025', 'johnson_v050',
+               'jwst_f070w',   'jwst_f090w',   'jwst_f115w',   'jwst_f150w',
+               'jwst_f200w',   'jwst_f277w',   'jwst_f356w',   'jwst_f410m',
+               'jwst_f444w',   'jwst_f560w',   'jwst_f770w',   'jwst_f1000w',
+               'jwst_f1130w',  'jwst_f1280w',  'jwst_f1500w',  'jwst_f1800w',
+               'jwst_f2100w',  'jwst_f2550w',
+               'roman_f062',   'roman_f087',   'roman_f106',   'roman_f129',
+               'roman_f146',   'roman_f158',   'roman_f184',   'roman_f213',
+               # 'spitzer_ch1',  'spitzer_ch2',  'spitzer_ch3',  'spitzer_ch4',
+               # 'spitzer_24',   'spitzer_70',   'spitzer_160',
+               # 'wise_w1',      'wise_w2',      'wise_w3',      'wise_w4']
+               ]
     
     dictionary = {}
     for filt in filters :
@@ -32,12 +36,12 @@ def calculate_pivots_and_fwhm() :
         
         # get the wavelength and transmission array from the file, and populate
         file = 'passbands/passbands_micron/{}.txt'.format(filt)
-        array = np.genfromtxt(file, skip_header=1)
+        array = np.loadtxt(file)
         waves, transmission = array[:, 0], array[:, 1]
         
         # calculate the pivot wavelength, following Eq. A11 of Tokunagea & Vacca 2005
-        pivot = np.sqrt(np.trapz(transmission*waves, x=waves)/
-                        np.trapz(transmission/waves, x=waves))
+        pivot = np.sqrt(np.trapezoid(transmission*waves, x=waves)/
+                        np.trapezoid(transmission/waves, x=waves))
         dictionary[filt]['pivot'] = pivot*u.um
         
         # prepare the transmission array for calculating the FWHM
@@ -110,8 +114,8 @@ def calculate_psfs() :
     
     # Roman PSF FWHMs
     roman_filts = [key for key in dictionary.keys() if 'roman' in key]
-    roman_psfs = np.array([0.058, 0.073, 0.087, 0.105, 0.105, 0.127, 0.151,
-                           0.175])*u.arcsec
+    roman_psfs = np.array([0.058, 0.073, 0.087, 0.106, 0.105, 0.128, 0.146,
+                           0.169])*u.arcsec
     for filt, psf in zip(roman_filts, roman_psfs) :
         dictionary[filt]['psf'] = psf
     
@@ -124,73 +128,33 @@ def calculate_psfs() :
     
     return dictionary
 
-def compare_nircam() :
-
-    olddir = 'passbands/passbands_JWST_NIRCam_for-4Nov2022-from-JDocs/'
-    newdir = 'passbands/passbands_micron/'
-    oldfilts = ['F070W_mean_system_throughput.txt',
-                'F090W_mean_system_throughput.txt',
-                'F115W_mean_system_throughput.txt',
-                'F150W_mean_system_throughput.txt',
-                'F200W_mean_system_throughput.txt',
-                'F277W_mean_system_throughput.txt',
-                'F356W_mean_system_throughput.txt',
-                'F410M_mean_system_throughput.txt',
-                'F444W_mean_system_throughput.txt']
-    newfilts = ['jwst_f070w.txt', 'jwst_f090w.txt', 'jwst_f115w.txt',
-                'jwst_f150w.txt', 'jwst_f200w.txt', 'jwst_f277w.txt',
-                'jwst_f356w.txt', 'jwst_f410m.txt', 'jwst_f444w.txt']
-    
-    for oldfilt, newfilt in zip(oldfilts, newfilts) :
-        old = np.genfromtxt(olddir + oldfilt, skip_header=1)
-        new = np.genfromtxt(newdir + newfilt)
-    
-        plt.plot_simple_multi([old[:, 0], new[:, 0]], [old[:, 1], new[:, 1]],
-            ['old', 'new'], ['k', 'r'], ['', ''], ['-', '-'], [1, 1],
-            scale='linear')
-    
-    return
-
-def check_roman() :
-    
-    filters = ['f062', 'f087', 'f106', 'f129', 'f146', 'f158', 'f184', 'f213']
-    
-    waves = []
-    throughputs = []
-    for filt in filters :
-        file = np.genfromtxt('passbands/passbands_micron/roman_{}.txt'.format(
-            filt), skip_header=1)
-        waves.append(file[:, 0])
-        throughputs.append(file[:, 1])
-    
-    plt.plot_simple_multi(waves, throughputs, filters,
-        ['b', 'g', 'y', 'orange', 'grey', 'orangered', 'm', 'r'],
-        ['', '', '', '', '', '', '', '', ''],
-        ['-', '-', '-', '-', '--', '-', '-', '-', '-'], np.ones(9),
-        xmin=0.4, xmax=2.45, ymin=0, scale='linear')
-    
-    return
-
 def prepare_throughputs_for_fastpp() :
     
-    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
+    filters = ['castor_uv',    'castor_uvL',   'castor_uS',    'castor_u',
                'castor_g',
-               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
-               'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
-               'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
-               'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
-               'hst_f814w',   'hst_f850lp',  'hst_f105w',   'hst_f110w',
-               'hst_f125w',   'hst_f140w',   'hst_f160w',
-               'jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
-               'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
-               'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
-               'jwst_f1130w', 'jwst_f1280w', 'jwst_f1500w', 'jwst_f1800w',
-               'jwst_f2100w', 'jwst_f2550w',
-               'roman_f062',  'roman_f087',  'roman_f106',  'roman_f129',
-               'roman_f146',  'roman_f158',  'roman_f184',  'roman_f213']
+               'euclid_ie',    'euclid_ye',    'euclid_je',    'euclid_he',
+               'galex_fuv',    'galex_nuv',
+               'herschel_70',  'herschel_100', 'herschel_160',
+               'herschel_250', 'herschel_350', 'herschel_500',
+               'hst_f218w',    'hst_f225w',    'hst_f275w',    'hst_f336w',
+               'hst_f390w',    'hst_f438w',    'hst_f435w',    'hst_f475w',
+               'hst_f555w',    'hst_f606w',    'hst_f625w',    'hst_f775w',
+               'hst_f814w',    'hst_f850lp',   'hst_f105w',    'hst_f110w',
+               'hst_f125w',    'hst_f140w',    'hst_f160w',
+               'johnson_v',    'johnson_v025', 'johnson_v050',
+               'jwst_f070w',   'jwst_f090w',   'jwst_f115w',   'jwst_f150w',
+               'jwst_f200w',   'jwst_f277w',   'jwst_f356w',   'jwst_f410m',
+               'jwst_f444w',   'jwst_f560w',   'jwst_f770w',   'jwst_f1000w',
+               'jwst_f1130w',  'jwst_f1280w',  'jwst_f1500w',  'jwst_f1800w',
+               'jwst_f2100w',  'jwst_f2550w',
+               'roman_f062',   'roman_f087',   'roman_f106',   'roman_f129',
+               'roman_f146',   'roman_f158',   'roman_f184',   'roman_f213',
+               'spitzer_ch1',  'spitzer_ch2',  'spitzer_ch3',  'spitzer_ch4',
+               'spitzer_24',   'spitzer_70',   'spitzer_160',
+               'wise_w1',      'wise_w2',      'wise_w3',      'wise_w4']
     
     for filt in filters :
-        array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
+        array = np.loadtxt('passbands/passbands_micron/{}.txt'.format(filt))
         final = np.array([np.arange(1, len(array) + 1), array[:, 0]*1e4, array[:, 1]]).T
         fmt = ['%-4i', '%12.5e', '%12.5e']
         header = '   {} {}'.format(len(array), filt)
@@ -199,32 +163,11 @@ def prepare_throughputs_for_fastpp() :
     
     return
 
-def prepare_throughputs_for_skirt() :
-    
-    filters = ['castor_uv',   'castor_uvL',  'castor_uS',   'castor_u',
-               'castor_g',
-               'euclid_ie',   'euclid_ye',   'euclid_je',   'euclid_he',
-               'hst_f218w',   'hst_f225w',   'hst_f275w',   'hst_f336w',
-               'hst_f390w',   'hst_f438w',   'hst_f435w',   'hst_f475w',
-               'hst_f555w',   'hst_f606w',   'hst_f625w',   'hst_f775w',
-               'hst_f814w',   'hst_f850lp',  'hst_f105w',   'hst_f110w',
-               'hst_f125w',   'hst_f140w',   'hst_f160w',
-               'jwst_f070w',  'jwst_f090w',  'jwst_f115w',  'jwst_f150w',
-               'jwst_f200w',  'jwst_f277w',  'jwst_f356w',  'jwst_f410m',
-               'jwst_f444w',  'jwst_f560w',  'jwst_f770w',  'jwst_f1000w',
-               'jwst_f1130w', 'jwst_f1280w', 'jwst_f1500w', 'jwst_f1800w',
-               'jwst_f2100w', 'jwst_f2550w',
-               'roman_f062',  'roman_f087',  'roman_f106',  'roman_f129',
-               'roman_f146',  'roman_f158',  'roman_f184',  'roman_f213']
-    
-    for filt in filters :
-        array = np.genfromtxt('passbands/passbands_micron/{}.txt'.format(filt))
-        final = np.array([array[:, 0]*1e4, array[:, 1]]).T
-        np.savetxt('passbands/passbands_SKIRT_angstrom/{}.txt'.format(filt), final)
-    
-    return
-
 def throughputs_castor() :
+    
+    # https://github.com/CASTOR-telescope/ETC/tree/master/castor_etc/data/passbands
+    
+    # https://github.com/CASTOR-telescope/ETC_notebooks/tree/master/data
     
     inDir = 'passbands/passbands_CASTOR_Phase-0-ETC-github/'
     files = ['passband_castor.uv', 'passband_castor.u', 'passband_castor.g']
@@ -232,10 +175,10 @@ def throughputs_castor() :
     for file in files :
         filt = file.split('.')[1]
         
-        final = np.genfromtxt(inDir + file)
+        final = np.loadtxt(inDir + file)
         
         np.savetxt('passbands/passbands_micron/castor_{}.txt'.format(filt),
-                    final, header='WAVELENGTH THROUGHPUT')
+                   final, header='WAVELENGTH THROUGHPUT')
     
     inDir = 'passbands/passbands_CASTOR_Phase-0-ETC-notebooks-github/'
     files = ['passband_castor.uv_split_bb', 'passband_castor.u_split_bb']
@@ -280,197 +223,178 @@ def throughputs_euclid() :
     
     return
 
+def throughputs_galex() :
+    
+    # https://asd.gsfc.nasa.gov/archive/galex/instrument.html
+    
+    # https://asd.gsfc.nasa.gov/archive/galex/Documents/PostLaunchResponseCurveData.html
+    
+    inDir = 'passbands/passbands_GALEX_for-PostLaunch2006-from-GSFC/'
+    filts = ['FUV', 'NUV']
+    area = np.pi*np.square(25) # GALEX was 50 cm in diameter
+    
+    for filt in filts :
+        
+        waves, eff_area = np.loadtxt(inDir + filt + '.txt', skiprows=1, unpack=True)
+        final = np.array([waves/1e4, eff_area/area]).T
+        
+        np.savetxt('passbands/passbands_micron/galex_{}.txt'.format(filt.lower()),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    return
+
+def throughputs_herschel() :
+    
+    # https://nhscsci.ipac.caltech.edu/sc/index.php/Pacs/FilterCurves
+    
+    inDir = 'passbands/passbands_Herschel_PACS_for-29Mar2010-from-IPAC/'
+    
+    filts = ['blue', 'green', 'red']
+    names = ['70', '100', '160']
+    for filt, name in zip(filts, names) :
+        waves, trans = np.loadtxt(inDir + 'Herschel_Pacs.{}.dat'.format(filt),
+                                  unpack=True)
+        final = np.array([waves/1e4, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/herschel_{}.txt'.format(name),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    # https://irsa.ipac.caltech.edu/data/Herschel/docs/nhsc/spire/PhotInstrumentDescription.html
+    
+    # https://irsa.ipac.caltech.edu/data/Herschel/docs/nhsc/spire/SpirePhotRSRF.fits
+    
+    # https://archives.esac.esa.int/hsa/legacy/ADP/SPIRE/SPIRE-P_filter_curves/
+    
+    inDir = 'passbands/passbands_Herschel_SPIRE_for-14Jun2016-from-HSA/'
+    
+    table = Table.read(inDir + 'SpirePhotRSRF.fits')
+    filts = ['psw', 'pmw', 'plw']
+    names = ['250', '350', '500']
+    
+    for filt, name in zip(filts, names) :
+        waves, trans = 1/table['wavenumber'].data*1e4, table[filt].data
+        trans[trans < 0] = 0
+        
+        final = np.array([np.flip(waves), np.flip(trans)]).T
+        
+        np.savetxt('passbands/passbands_micron/herschel_{}.txt'.format(name),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    return
+
 def throughputs_hst() :
     
     # https://stsynphot.readthedocs.io/en/latest/stsynphot/appendixb_inflight.html
     
     # https://stsynphot.readthedocs.io/en/latest/stsynphot/obsmode.html
     
-    # HFF_programs = [11108, 11507, 11582, 11591, 13459, 13790, 14038, 14216, # a370
-    #                 12458, 13459, 14037, 14209, # a1063
-    #                 11689, 13386, 13389, 13495, 14209, # a2744
-    #                 12459, 13386, 13496, 14209, # m416
-    #                 9722, 10420, 10493, 10793, 12103, 13389, 13459, 13498, 14209, # m717
-    #                12068, 13504, 13790, 14041 # m1149
-    #                ]
-    # unique = [ 9722, 10420, 10493, 10793, 11108, 11507, 11582, 11591, 11689, 12068,
-    #           12103, 12458, 12459, 13386, 13389, 13459, 13495, 13496, 13498, 13504,
-    #           13790, 14037, 14038, 14041, 14209, 14216]
-    # obs = Table.read('noise/HST_HFF_observations.fits')
-    # from astropy.time import Time
-    # dates = Time(obs['start_TimeISO'], format='iso').mjd
-    # median = np.percentile(dates, 50) # Aug 28, 2014
+    # get the throughputs for the ACS WFC filters
+    from stsynphot.config import conf
+    conf.rootdir = 'D:/Documents/GitHub/CASTOR/noise/trds'
+    
+    from synphot.config import conf as syn_conf
+    syn_conf.vega_file = 'D:/Documents/GitHub/CASTOR/noise/trds/calspec/alpha_lyr_stis_011.fits'
+    
+    from stsynphot.spectrum import band
     
     # https://core2.gsfc.nasa.gov/time/julian.html, MJD = JD - 2400001
-    median = 60401 # Apr 1, 2024
+    mjd = 55008 # June 26, 2009, ie. approximately when WFC3 was installed
     
-    obsmodes = []
+    filts = ['f435w', 'f475w', 'f555w', 'f606w', 'f625w', 'f775w', 'f814w', 'f850lp']
+    for filt in filts :
+        bp1 = band('acs,wfc1,{},mjd#{}'.format(filt, mjd))
+        bp2 = band('acs,wfc2,{},mjd#{}'.format(filt, mjd))
+        
+        waves = bp1.binset.to(u.um) # exactly equal to bp2.binset as well
+        trans1, trans2 = bp1(waves), bp2(waves)
+        
+        final = np.array([waves.data, np.mean([trans1, trans2], axis=0)]).T
+        
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
+                   header='WAVELENGTH THROUGHPUT')
     
-    wfc3_uv_detectors = ['uvis1', 'uvis2']
-    wfc3_uv_filters = ['f218w', 'f225w', 'f275w', 'f336w', 'f390w', 'f438w']
-    for filt in wfc3_uv_filters :
-        for detector in wfc3_uv_detectors :    
-            obsmode = 'wfc3,' + detector + ',' + filt
-            obsmodes.append(obsmode)
-    
-    acs_detectors = ['wfc1', 'wfc2']
-    acs_filters = ['f435w', 'f475w', 'f555w', 'f606w', 'f625w', 'f775w',
-                   'f814w', 'f850lp']
-    for filt in acs_filters :
-        for detector in acs_detectors :    
-            obsmode = 'acs,' + detector + ',' + filt
-            obsmodes.append(obsmode)
-    
-    wfc3_ir_filters = ['f105w', 'f110w', 'f125w', 'f140w', 'f160w']
-    for filt in wfc3_ir_filters :
-        obsmode = 'wfc3,ir,' + filt
-        obsmodes.append(obsmode)
+    # https://www.stsci.edu/hst/instrumentation/wfc3/performance/throughputs
     
     # get the throughputs for the WFC3 UVIS filters
-    for i in range(0, 12, 2) :
+    inDir = 'passbands/passbands_HST_WFC3-UVIS_for-26Jun2009-from-STScI/'
+    filts = ['f218w', 'f225w', 'f275w', 'f336w', 'f390w', 'f438w']
+    for filt in filts :
+        waves, trans1 = np.loadtxt(inDir + 'wfc3_uvis1_{}.txt'.format(filt),
+                                   unpack=True)
+        _, trans2 = np.loadtxt(inDir + 'wfc3_uvis2_{}.txt'.format(filt),
+                               unpack=True)
         
-        filt = obsmodes[i].split(',')[2]
+        final = np.array([waves/1e4, np.mean([trans1, trans2], axis=0)]).T
         
-        bp1 = stsyn.band(obsmodes[i] + ',mjd#{}'.format(median))
-        bp2 = stsyn.band(obsmodes[i+1] + ',mjd#{}'.format(median))
-        waves1, waves2 = bp1.binset, bp2.binset
-        throughput1, throughput2 = bp1(waves1), bp2(waves2)
-        
-        throughput = np.mean([throughput1, throughput2], axis=0)
-        
-        final = np.array([waves1.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
-        
-        # plt.plot_simple_multi([waves1, waves1, waves1],
-        #     [throughput1, throughput2, throughput], ['1', '2', 'avg'],
-        #     ['k', 'b', 'r'], ['', '', ''], ['-', '-', '-'], [1, 1, 1],
-        #     scale='linear', xmin=1950, xmax=4800)
-    
-    # get the throughputs for the ACS WFC filters
-    for i in range(12, 28, 2) :
-        
-        filt = obsmodes[i].split(',')[2]
-        
-        bp1 = stsyn.band(obsmodes[i] + ',mjd#{}'.format(median))
-        bp2 = stsyn.band(obsmodes[i+1] + ',mjd#{}'.format(median))
-        waves1, waves2 = bp1.binset, bp2.binset
-        throughput1, throughput2 = bp1(waves1), bp2(waves2)
-        
-        throughput = np.mean([throughput1, throughput2], axis=0)
-        
-        final = np.array([waves1.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
-        
-        # plt.plot_simple_multi([waves1, waves1, waves1],
-        #     [throughput1, throughput2, throughput], ['1', '2', 'avg'],
-        #     ['k', 'b', 'r'], ['', '', ''], ['-', '-', '-'], [1, 1, 1],
-        #     scale='linear', xmin=3500, xmax=11000)
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
     
     # get the throughputs for the WFC3 IR filters
-    for i in range(28, 33) :
+    inDir = 'passbands/passbands_HST_WFC3-IR_for-26Jun2009-from-STScI/'
+    filts = ['f105w', 'f110w', 'f125w', 'f140w', 'f160w']
+    for filt in filts :
+        waves, trans = np.loadtxt(inDir + 'wfc3_ir_{}.txt'.format(filt),
+                                  unpack=True)
         
-        filt = obsmodes[i].split(',')[2]
+        final = np.array([waves/1e4, trans]).T
         
-        bp = stsyn.band(obsmodes[i] + ',mjd#{}'.format(median))
-        waves = bp.binset
-        throughput = bp(waves)
-        
-        final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
-        
-        # plt.plot_simple_multi([waves], [throughput], [''], ['k'], [''], ['-'],
-        #     [1], scale='linear', xmin=8500, xmax=17500)
+        np.savetxt('passbands/passbands_micron/hst_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    return
+
+def throughputs_johnson() :
+    
+    # https://ui.adsabs.harvard.edu/abs/2006AJ....131.1184M/abstract
+    
+    # https://cdsarc.cds.unistra.fr/viz-bin/cat/J/AJ/131/1184
+    
+    inDir = 'passbands/passbands_Johnson_for-Feb2006-from-ADS/'
+    waves, trans = np.loadtxt(inDir + 'johnson_v.dat', unpack=True)
+    
+    filts = ['johnson_v', 'johnson_v025', 'johnson_v050']
+    coeffs = [1, 1.25, 1.5]
+    
+    for filt, coeff in zip(filts, coeffs) :
+        final = np.array([coeff*waves/1e4, trans]).T
+        np.savetxt('passbands/passbands_micron/{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
     
     return
 
 def throughputs_jwst() :
     
-    # https://jwst-docs.stsci.edu/jwst-exposure-time-calculator-overview/
-    # jwst-etc-pandeia-engine-tutorial/jwst-etc-instrument-throughputs
+    # https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-instrumentation/nircam-filters
     
-    nircamDir = 'noise/pandeia_data-2.0/jwst/nircam/filters/'
-    miriDir = 'noise/pandeia_data-2.0/jwst/miri/filters/'
+    inDir = ('passbands/passbands_JWST_NIRCam_for-Jan2025-from-JDocs/' +
+            'nircam_throughputs_Jan2025_v7/nircam_throughputs/mean_throughputs/')
     
-    sw_filters = ['f070w', 'f090w', 'f115w', 'f150w', 'f200w']
-    sw_conf = {#'detector':{'nexp':1, 'ngroup':10, 'nint':1
-               #            'readout_pattern':'medium8', 'subarray':'full'},
-               'instrument':{'aperture':'sw', 'disperser':'null',
-                             'filter':'', 'instrument':'nircam',
-                             'mode':'sw_imaging'}}
+    filts = ['F070W', 'F090W', 'F115W', 'F150W', 'F200W', 'F277W', 'F356W',
+             'F410M', 'F444W']
+    for filt in filts :
+        waves, trans = np.loadtxt(
+            inDir + '{}_May2024_mean_system_throughput.txt'.format(filt),
+            unpack=True, skiprows=1)
+        final = np.array([waves, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt.lower()),
+                   final, header='WAVELENGTH THROUGHPUT')
     
-    lw_filters = ['f277w', 'f356w', 'f410m', 'f444w']
-    lw_conf = {#'detector':{'nexp':1, 'ngroup':10, 'nint':1
-               #            'readout_pattern':'medium8', 'subarray':'full'},
-               'instrument':{'aperture':'lw', 'disperser':'null',
-                             'filter':'', 'instrument':'nircam',
-                             'mode':'lw_imaging'}}
+    # https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-technical-library
     
-    miri_filters = ['f0560w', 'f0770w', 'f1000w', 'f1130w', 'f1280w', 'f1500w',
-                    'f1800w', 'f2100w', 'f2550w']
-    miri_conf = {#'detector': {'nexp':1, 'ngroup':10, 'nint':1,
-                 #             'readout_pattern':'fastr1', 'subarray':'full'},
-                 'instrument': {'aperture':'imager', 'filter':'',
-                                'instrument':'miri', 'mode':'imaging'}}
+    inDir = 'passbands/passbands_JWST_MIRI_for-11Sep2024-from-STScIBox/MIRI_endtoend_throughputs_v4.0/'
     
-    for filt in sw_filters :
-        file = nircamDir + 'jwst_nircam_{}_trans_20221103152537.fits'.format(filt)
-        tab = Table.read(file)
-        waves = tab['WAVELENGTH'].value*u.um
+    filts = ['F560W', 'F770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W',
+             'F2100W', 'F2550W']
+    for filt in filts :
+        table = Table.read(inDir +
+            'MIRI_{}_endtoend_throughput_perphoton_ETC4.0.fits'.format(filt))
+        waves, trans = table['WAVELENGTH'].data, table['THROUGHPUT'].data
         
-        # create a configured instrument
-        conf = sw_conf
-        conf['instrument']['filter'] = filt
-        instrument_factory = InstrumentFactory(config=conf)
+        final = np.array([waves, trans]).T
         
-        # get the throughput of the instrument over the desired wavelengths
-        throughput = instrument_factory.get_total_eff(waves.value)
-        
-        final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
-    
-    for filt in lw_filters :
-        file = nircamDir + 'jwst_nircam_{}_trans_20221103152537.fits'.format(filt)
-        tab = Table.read(file)
-        waves = tab['WAVELENGTH'].value*u.um
-        
-        # create a configured instrument
-        conf = lw_conf
-        conf['instrument']['filter'] = filt
-        instrument_factory = InstrumentFactory(config=conf)
-        
-        # get the throughput of the instrument over the desired wavelengths
-        throughput = instrument_factory.get_total_eff(waves.value)
-        
-        final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
-    
-    for filt in miri_filters :
-        
-        file = miriDir + 'jwst_miri_{}_trans_20221013160429.fits'.format(filt)
-        tab = Table.read(file)
-        waves = tab['WAVELENGTH'].value*u.um
-        
-        if filt == 'f0560w' :
-            filt = 'f560w'
-        if filt == 'f0770w' :
-            filt = 'f770w'
-        
-        # create a configured instrument
-        conf = miri_conf
-        conf['instrument']['filter'] = filt
-        instrument_factory = InstrumentFactory(config=conf)
-        
-        # get the throughput of the instrument over the desired wavelengths
-        throughput = instrument_factory.get_total_eff(waves.value)
-        
-        final = np.array([waves.to(u.um).value, throughput]).T
-        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt), final,
-                   header='WAVELENGTH THROUGHPUT')
+        np.savetxt('passbands/passbands_micron/jwst_{}.txt'.format(filt.lower()),
+                   final, header='WAVELENGTH THROUGHPUT')
     
     return
 
@@ -478,23 +402,77 @@ def throughputs_roman() :
     
     # https://roman.gsfc.nasa.gov/science/WFI_technical.html
     
-    # https://roman.gsfc.nasa.gov/science/Roman_Reference_Information.html
+    # https://vmromanweb1.ipac.caltech.edu/page/param-db
     
-    inDir = 'passbands/passbands_Roman_for-14Jun2021-from-GSFC/'
-    eff_areas = np.genfromtxt(inDir + 'Roman_effarea_20210614.csv',
-                              delimiter=',', skip_header=1)
+    inDir = 'passbands/passbands_Roman_for-27Mar2024-from-GSFC/'
+    all_SCAs = np.full((18, 2200, 12), np.nan)
+    for i in range(18):
+        infile = inDir + 'Roman_effarea_v8_SCA{:02}_20240301.ecsv'.format(i + 1)
+        all_SCAs[i] = np.loadtxt(infile, delimiter=',', skiprows=18)
+    eff_areas = np.mean(all_SCAs, axis=0)
     area = np.pi*np.square(1.18) # Roman will be 2.36 m in diameter
     
-    filters = ['f062', 'f087', 'f106', 'f129', 'f146', 'f158', 'f184', 'f213']
+    filters = ['f062', 'f087', 'f106', 'f129', 'f158', 'f184', 'f146', 'f213']
     for i, filt in enumerate(filters) :
         final = np.array([eff_areas[:, 0], eff_areas[:, i+1]/area]).T
         
-        # plt.plot_simple_dumb(eff_areas[:, 0], eff_areas[:, i+1]/area, xmin=0.4, xmax=2.5)
-        # plt.plot_simple_dumb(eff_areas[:, 0],
-        #                      eff_areas[:, i+1]/(area*(1-np.square(0.303))),
-        #                      xmin=0.4, xmax=2.5)
-        
-        np.savetxt('passbands/passbands_micron/roman_{}.txt'.format(filt), final,
+        np.savetxt('passbands/passbands_micron/roman_{}_new.txt'.format(filt), final,
                    header='WAVELENGTH THROUGHPUT')
+    
+    return
+
+def throughputs_spitzer() :
+    
+    # https://irsa.ipac.caltech.edu/data/SPITZER/docs/irac/iracinstrumenthandbook/6/
+    
+    # https://irsa.ipac.caltech.edu/data/SPITZER/docs/irac/calibrationfiles/spectralresponse/
+    
+    inDir = 'passbands/passbands_Spitzer_IRAC_for-Sep2021-from-IRSA/'
+    
+    filts = ['ch1', 'ch2', 'ch3', 'ch4']
+    for filt in filts :
+        waves, trans = np.loadtxt(inDir + 'irac_201125{}trans_full.txt'.format(filt),
+                                  skiprows=3, unpack=True)
+        final = np.array([waves, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/spitzer_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    # https://irsa.ipac.caltech.edu/data/SPITZER/docs/mips/mipsinstrumenthandbook/6/
+    
+    # https://irsa.ipac.caltech.edu/data/SPITZER/docs/mips/calibrationfiles/spectralresponse/
+    
+    inDir = 'passbands/passbands_Spitzer_MIPS_for-Mar2011-from-IPAC/'
+    
+    filts = ['24', '70', '160']
+    cols = [[0, 1], [2, 3], [4, 5]]
+    maxis = [128, 111, 400]
+    
+    for filt, col, maxi in zip(filts, cols, maxis) :
+        waves, trans = np.genfromtxt(inDir + 'MIPSfiltsumm.csv', delimiter=',',
+                                     usecols=col, unpack=True, max_rows=maxi)
+        final = np.array([waves, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/spitzer_{}.txt'.format(filt),
+                   final, header='WAVELENGTH THROUGHPUT')
+    
+    return
+
+def throughputs_wise() :
+    
+    # https://www.astro.ucla.edu/~wright/WISE/passbands.html
+    
+    # https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#WISEZMA
+    
+    inDir = 'passbands/passbands_WISE_for-14Apr2011-from-IPAC/'
+    
+    filts = ['W1', 'W2', 'W3', 'W4']
+    for filt in filts :
+        waves, trans, _ = np.loadtxt(inDir + 'RSR-{}.txt'.format(filt),
+                                     skiprows=2, unpack=True)
+        final = np.array([waves, trans]).T
+        
+        np.savetxt('passbands/passbands_micron/wise_{}.txt'.format(filt.lower()),
+                   final, header='WAVELENGTH THROUGHPUT')
     
     return

@@ -1,221 +1,15 @@
 
-import os
 from os.path import exists
 import numpy as np
 import pickle
 
 import astropy.constants as c
-from astropy.convolution import convolve, Gaussian2DKernel
-from astropy.io import fits
 from astropy.table import Table
 import astropy.units as u
 import h5py
 
 import filters
 import plotting as plt
-
-import warnings
-warnings.filterwarnings('ignore', category=RuntimeWarning)
-
-def add_noise_all(population='quenched', psf=0.15*u.arcsec) :
-    
-    table = Table.read('tools/subIDs.fits')
-    subIDs = table['subID'].data
-    # subIDs = [63871, 96771, 198186] # for testing
-    
-    for subID in subIDs :
-        if subID != 14 :
-            add_noise_and_psf(subID, 'castor_ultradeep', population=population, psf=psf)
-            add_noise_and_psf(subID, 'roman_hlwas', population=population, psf=psf)
-            add_noise_and_psf(subID, 'hst_deep', population=population, psf=psf)
-            add_noise_and_psf(subID, 'jwst_deep', population=population, psf=psf)
-            print('{} done'.format(subID))
-    
-    return
-
-def add_noise_and_psf(subID, telescope, population='quenched',
-                      psf=0.15*u.arcsec, display=False, save=True) :
-    
-    # telescope diameters from
-    # https://www.castormission.org/mission
-    # https://www.jwst.nasa.gov/content/forScientists/
-    # faqScientists.html#collectingarea
-    # https://jwst-docs.stsci.edu/jwst-observatory-hardware/jwst-telescope
-    # https://roman.ipac.caltech.edu/sims/Param_db.html
-    
-    inDir = 'SKIRT/SKIRT_output_quenched/'
-    outDir = 'cutouts/{}/{}/'.format(population, subID)
-    passbandsDir = 'passbands/passbands_micron/'
-    
-    # open the SKIRT output file, and get the plate scale for the SKIRT images
-    infile = '{}{}/{}_{}_total.fits'.format(inDir, subID, subID,
-        telescope.split('_')[0].upper())
-    with fits.open(infile) as hdu :
-        plate_scale = (hdu[0].header)['CDELT1']*u.arcsec/u.pix
-        data = hdu[0].data*u.MJy/u.sr
-    
-    # get all the parameters for every telescope
-    dictionary = get_noise()
-    
-    if telescope == 'castor_wide' :
-        exposures = np.array([1000, 1000, 2000])*u.s
-        area = np.pi*np.square(100*u.cm/2)
-    elif telescope == 'castor_deep' :
-        exposures =  np.array([18000, 18000, 36000])*u.s
-        area = np.pi*np.square(100*u.cm/2)
-    elif telescope == 'castor_ultradeep' :
-        exposures =  np.array([180000, 180000, 360000])*u.s
-        area = np.pi*np.square(100*u.cm/2)
-    elif telescope == 'hst_hff' :
-        # get the maximum exposure time for each HFF filter
-        with h5py.File('background/HFF_exposure_times.hdf5', 'r') as hf :
-            exps = hf['exposures'][:]
-        exps = np.nanmax(exps, axis=1)
-        exposures = np.concatenate([exps[:1], exps[:5], exps[4:]])*u.s
-        area = np.pi*np.square(240*u.cm/2)
-    elif telescope == 'hst_deep' : # assume 30 hrs per filter for now
-        exposures = 108000*np.ones(19)*u.s
-        area = np.pi*np.square(240*u.cm/2)
-    elif telescope == 'jwst_deep' : # assume 10 hrs per filter for now
-        exposures = 36000*np.ones(18)*u.s
-        area = np.pi*np.square(578.673*u.cm/2)
-    elif telescope == 'roman_hlwas' :
-        exposures = 146*np.ones(8)*u.s
-        area = np.pi*np.square(236*u.cm/2)
-    
-    # get the filter names for the telescope
-    filters = [key for key in dictionary.keys() if telescope.split('_')[0] in key]
-    length = len(filters)
-    
-    # get certain attributes of the filters
-    pivots = np.full(length, np.nan)*u.um
-    widths = np.full(length, np.nan)*u.um
-    backgrounds = np.full(length, np.nan)*u.mag/np.square(u.arcsec)
-    dark_currents = np.full(length, np.nan)*u.electron/u.s/u.pix
-    read_noises = np.full(length, np.nan)*u.electron/u.pix
-    for i, filt in enumerate(filters) :
-        pivots[i] = dictionary[filt]['pivot']
-        widths[i] = dictionary[filt]['fwhm']
-        backgrounds[i] = dictionary[filt]['background']
-        dark_currents[i] = dictionary[filt]['dark_current']
-        read_noises[i] = dictionary[filt]['read_noise']
-    
-    # get the sky background levels in Jy/arcsec^2
-    bkg_Jy = mag_to_Jy(backgrounds)
-    
-    # get the throughputs at the pivot wavelengths
-    throughputs = np.full(length, np.nan)
-    for i, (filt, pivot) in enumerate(zip(filters, pivots)) :
-        array = np.genfromtxt(passbandsDir + filt + '.txt')
-        waves, response = array[:, 0]*u.um, array[:, 1]
-        throughputs[i] = np.interp(pivot, waves, response)
-    
-    # get the area of a pixel on the sky, in arcsec^2
-    pixel_area = np.square(plate_scale*u.pix)
-    
-    # calculate the conversion factor PHOTFNU to get janskys [per pixel]
-    # from spatial electron flux electron/s/cm^2 [per pixel]
-    photfnus = calculate_photfnu(1*u.electron/u.s/np.square(u.cm), pivots,
-        widths, throughputs)
-    
-    # get the background electrons per second per pixel
-    Bsky = bkg_Jy*area*pixel_area/photfnus
-    
-    # get the background electrons per pixel over the entire exposure
-    background_electrons = Bsky*exposures
-    
-    # get the dark current electrons per second per pixel
-    Bdet = dark_currents*u.pix
-    
-    # get the dark current electrons per pixel over the entire exposure
-    detector_electrons = Bdet*exposures
-    
-    # get the number of reads, limiting a given exposure to 1000 s, as longer
-    # exposures than 1000 s will be dominated by cosmic rays
-    single_exposure = 1000*u.s
-    Nreads = np.ceil(exposures/single_exposure)
-    
-    # get the read noise electrons per pixel
-    read_electrons = read_noises*u.pix
-    
-    # get the total non-source noise per pixel over the entire exposure
-    nonsource_level = background_electrons + detector_electrons
-    
-    # check the brightness of the galaxy in the given bands
-    # mags = []
-    # for frame in data :
-    #     print(np.sum(frame*pixel_area).to(u.Jy))
-    #     m_AB = -2.5*np.log10(np.sum(frame*pixel_area).to(u.Jy)/(3631*u.Jy))*u.mag
-    #     mags.append(m_AB.value)
-    # print(mags)
-    
-    # convert the PSF FWHM (that we'll use to convolve the images) into pixels
-    sigma = psf/(2*np.sqrt(2*np.log(2))) # arcseconds
-    sigma_pix = sigma/plate_scale # pixels
-    
-    for (filt, frame, pivot, width, throughput, exposure, level, Nread, RR,
-         photfnu) in zip(filters, data, pivots, widths, throughputs, exposures,
-                         nonsource_level, Nreads, read_electrons, photfnus) :
-                         
-        # convert the noiseless synthetic SKIRT image to convenient units
-        frame = frame.to(u.Jy/np.square(u.arcsec)) # Jy/arcsec^2 [per pixel]
-        
-        # get the noiseless synthetic SKIRT image
-        image = frame*exposure*area*pixel_area/photfnu # electron [per pixel]
-        # plt.display_image_simple(image.value, vmin=None, vmax=None)
-        
-        # define the convolution kernel and convolve the image
-        kernel = Gaussian2DKernel(sigma_pix.value)
-        convolved = convolve(image.value, kernel)*u.electron # electron [per pixel]
-        # plt.display_image_simple(convolved.value, vmin=None, vmax=None)
-        
-        # add the non-source level to the convolved image
-        noisey = convolved + level # electron [per pixel]
-        # plt.display_image_simple(noisey.value, vmin=None, vmax=None)
-        
-        # sample from a Poisson distribution with the noisey data
-        sampled = np.random.poisson(noisey.value)*u.electron # electron [per pixel]
-        # plt.display_image_simple(sampled.value, vmin=None, vmax=None)
-        
-        # add the RMS noise value
-        sampled = np.random.normal(sampled.value,
-            scale=np.sqrt(Nread)*RR.value)*u.electron # electron [per pixel]
-        # plt.display_image_simple(sampled.value, vmin=None, vmax=None)
-        
-        # subtract the background from the sampled image
-        subtracted = sampled - level # electron [per pixel]
-        # plt.display_image_simple(subtracted.value, vmin=None, vmax=None)
-        
-        # determine the final noise
-        noise = np.sqrt(noisey.value +
-            Nread*np.square(RR.value))*u.electron # electron [per pixel]
-        
-        # convert back to janskys [per pixel]
-        # subtracted = subtracted/exposure/area*photfnu
-        # noise = noise/exposure/area*photfnu
-        # if display :
-        #     plt.display_image_simple(final.value, vmin=1e-10, vmax=1e-6)
-        #     plt.display_image_simple(noise.value, vmin=1e-9, vmax=1e-8)
-        
-        # save the output to file
-        if save :
-            os.makedirs(outDir, exist_ok=True)
-            
-            outfile = '{}_{}.fits'.format(filt, telescope.split('_')[1])
-            save_cutout(subtracted.value, outDir + outfile, exposure.value,
-                        area.value, photfnu.value, plate_scale.value, 0.5)
-            
-            noise_outfile = '{}_{}_noise.fits'.format(filt, telescope.split('_')[1])
-            save_cutout(noise.value, outDir + noise_outfile, exposure.value,
-                        area.value, photfnu.value, plate_scale.value, 0.5)
-            
-            os.makedirs(outDir + '/snr_maps/', exist_ok=True)
-            snr_outfile = '{}_{}_snr.png'.format(filt, telescope.split('_')[1])
-            plt.display_image_simple(subtracted.value/noise.value,
-                lognorm=False, vmin=0.5, vmax=10, save=True,
-                outfile=outDir + '/snr_maps/' + snr_outfile)
-    
-    return
 
 def background_castor() :
     
@@ -236,7 +30,7 @@ def background_castor() :
 def background_euclid() :
     
     inDir = 'passbands/passbands_micron/'
-    filters = ['euclid_i', 'euclid_y', 'euclid_j', 'euclid_h']
+    filters = ['euclid_ie', 'euclid_ye', 'euclid_je', 'euclid_he']
     
     return determine_l2_background(inDir, filters)
 
@@ -268,23 +62,6 @@ def background_roman() :
                'roman_f146', 'roman_f158', 'roman_f184', 'roman_f213']
     
     return determine_l2_background(inDir, filters)
-
-def calculate_photfnu(electron_flux, lam_pivot, delta_lam,
-                      throughput, gain=1*u.electron/u.photon) :
-    
-    lam_pivot = lam_pivot.to(u.m) # convert from um to m
-    delta_lam = delta_lam.to(u.m) # convert from um to m
-    
-    # difference in wavelength to difference in frequency
-    delta_nu = (c.c*delta_lam/np.square(lam_pivot)).to(u.Hz)
-    
-    # calculate the photon flux in photons/s/cm^2/Hz
-    photnu = electron_flux/throughput/delta_nu/gain
-    
-    # calculate the flux density in janskys
-    photfnu = photnu.to(u.Jy, equivalencies=u.spectral_density(lam_pivot))
-    
-    return photfnu*u.s/u.electron*np.square(u.cm)
 
 def components_l2_background(waves) :
     # Sun-Earth L_2 Lagrange point
@@ -333,7 +110,7 @@ def components_l2_background(waves) :
         # loop over every wavelength
         for i, wave in enumerate(waves) :
             # get the background values at that wavelength
-            bkgs_at_wave = np.genfromtxt(
+            bkgs_at_wave = np.loadtxt(
                 inDir + 'bathtub_{:.2f}_micron.txt'.format(wave))[:, 1]
             
             # add the mean and median into the master arrays
@@ -427,7 +204,7 @@ def determine_l2_background(inDir, filters) :
     bkg = []
     for filt in filters :
         # get the wavelengths and response curves for a given filter
-        array = np.genfromtxt(inDir + filt + '.txt')
+        array = np.loadtxt(inDir + filt + '.txt')
         waves, response = (array[:, 0]*u.um).to(u.AA), array[:, 1]
         
         # super sample the wavelengths and response at 1 angstrom intervals
@@ -452,7 +229,7 @@ def determine_leo_background(inDir, filters) :
     bkg = []
     for filt in filters :
         # get the wavelengths and response curves for a given filter
-        array = np.genfromtxt(inDir + filt + '.txt')
+        array = np.loadtxt(inDir + filt + '.txt')
         waves, response = (array[:, 0]*u.um).to(u.AA), array[:, 1]
         
         # super sample the wavelengths and response at 1 angstrom intervals
@@ -472,6 +249,10 @@ def determine_leo_background(inDir, filters) :
     return np.array(bkg)
 
 def determine_noise_components() :
+    
+    # the saved read noise and dark current values are scaled assuming the
+    # images are saved with a final pixel scale of 0.05"/pixel, which is the
+    # notional CASTOR pixel scale after dithering
     
     dictionary = filters.calculate_psfs()
     
@@ -567,8 +348,8 @@ def determine_noise_components() :
 def flam_to_mag(waves, flam, response) :
     
     # from Eq. 2 of Bessell & Murphy 2012
-    numer = np.trapz(flam*response*waves*np.square(u.arcsec), x=waves)
-    denom = np.trapz(response/waves, x=waves)
+    numer = np.trapezoid(flam*response*waves*np.square(u.arcsec), x=waves)
+    denom = np.trapezoid(response/waves, x=waves)
     const = c.c.to(u.AA/u.s)
     
     fnu = (numer/const/denom).value
@@ -633,33 +414,6 @@ def hff_exposure_time_vs_lam() :
     
     return
 
-def mag_to_Jy(mag) :
-    # convert AB mag/arcsec^2 to Jy/arcsec^2
-    mag = mag.to(u.mag/np.square(u.arcsec))
-    return np.power(10, -0.4*(mag.value - 8.9))*u.Jy/np.square(u.arcsec)
-
-def save_cutout(data, outfile, exposure, det_area, photfnu, scale, redshift) :
-    
-    hdu = fits.PrimaryHDU(data)
-    
-    hdr = hdu.header
-    hdr['Z'] = redshift
-    hdr.comments['Z'] = 'object spectroscopic redshift--by definition'
-    hdr['EXPTIME'] = exposure
-    hdr.comments['EXPTIME'] = 'exposure duration (seconds)--calculated'
-    hdr['AREA'] = det_area
-    hdr.comments['AREA'] = 'detector area (cm2)--calculated'
-    hdr['PHOTFNU'] = photfnu
-    hdr.comments['PHOTFNU'] = 'inverse sensitivity, Jy*sec*cm2/electron'
-    hdr['SCALE'] = scale
-    hdr.comments['SCALE'] = 'Pixel size (arcsec) of output image'
-    hdr['BUNIT'] = 'electron'
-    hdr.comments['BUNIT'] = 'Physical unit of the array values'
-    
-    hdu.writeto(outfile)
-    
-    return
-
 def get_largest_psf(telescopes, not_miri=True) :
     
     # get the dictionary of all the filter parameters
@@ -689,3 +443,147 @@ def get_largest_psf(telescopes, not_miri=True) :
                         # is breaking this
     
     return
+
+'''
+# import warnings
+# warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+from core import open_cutout
+
+table = Table.read('tools/subIDs.fits')
+subIDs = table['subID'].data
+subIDs = subIDs[(subIDs < 14) | (subIDs > 14)]
+
+uv_los, uv_meds, uv_his = np.full(272, -1.), np.full(272, -1.), np.full(272, -1.)
+h_los, h_meds, h_his = np.full(272, -1.), np.full(272, -1.), np.full(272, -1.)
+integrated_snr = np.full(272, -1.)
+for i, subID in enumerate(subIDs) :
+    uv_file = 'cutouts/quenched/{}/castor_uv_ultradeep.fits'.format(subID)
+    uv_noise_file = 'cutouts/quenched/{}/castor_uv_ultradeep_noise.fits'.format(subID)
+    hband_file = 'cutouts/quenched/{}/roman_f158_hlwas.fits'.format(subID)
+    hband_noise_file = 'cutouts/quenched/{}/roman_f158_hlwas_noise.fits'.format(subID)
+    
+    uv, shape = open_cutout(uv_file, simple=True)
+    uv_noise, _ = open_cutout(uv_noise_file, simple=True)
+    hband, _ = open_cutout(hband_file, simple=True)
+    hband_noise, _ = open_cutout(hband_noise_file, simple=True)
+    
+    # need to calculate the circle that encloses 5 Re, given that the FoV is 20 Re
+    # on a side, and also account for even/odd number of pixels
+    
+    Re = shape[0]/20
+    center = int(shape[0]/2) # or np.round() ? not sure how to best select center
+    
+    YY, XX = np.ogrid[:shape[0], :shape[0]]
+    dist_from_center = np.sqrt(np.square(XX - center) + np.square(YY - center))
+    mask = (dist_from_center <= 5*Re)
+    small = (dist_from_center <= 2*Re)
+    # plt.display_image_simple(mask, lognorm=False)
+    
+    uv_central, uv_noise_central = uv.copy(), uv_noise.copy()
+    uv_central[~small], uv_noise_central[~small] = 0, 0
+    
+    integrated_snr[i] = np.sum(uv_central)/np.sqrt(np.sum(np.square(uv_noise_central)))
+    
+    uv[~mask], uv_noise[~mask] = 0, 0
+    hband[~mask], hband_noise[~mask] = 0, 0
+    
+    # plt.display_image_simple(uv/uv_noise, lognorm=False, vmin=0.5, vmax=10)
+    # plt.display_image_simple(hband/hband_noise, lognorm=False, vmin=0.5, vmax=10)
+    
+    # then use that circle as a mask to mask out pixels, and calculate the median
+    # +/- 1 sigma values for the S/N of the UV image, along with the median
+    # +/- 1 sigma values for the S/N of the Hband image, and plot one as a
+    # function of the other
+    
+    uv_snr = (uv/uv_noise).flatten()
+    uv_lo, uv_med, uv_hi = np.nanpercentile(uv_snr, [16, 50, 84])
+    hband_snr = (hband/hband_noise).flatten()
+    h_lo, h_med, h_hi = np.nanpercentile(hband_snr, [16, 50, 84])
+    
+    uv_los[i] = uv_lo
+    uv_meds[i] = uv_med
+    uv_his[i] = uv_hi
+    h_los[i] = h_lo
+    h_meds[i] = h_med
+    h_his[i] = h_hi
+
+# print(np.sort(integrated_snr))
+# print(np.percentile(integrated_snr, [16, 50, 84]))
+
+plt.plot_scatter_dumb(h_meds, uv_meds, integrated_snr, '', 'o',
+    xlabel='median Roman H band S/N per pixel within 5 Re',
+    ylabel='median CASTOR UV S/N per pixel within 5 Re',
+    cbar_label='integrated CASTOR UV S/N within 2 Re',
+    xmin=0.01, xmax=30, ymin=0.01, ymax=100, scale='log', loc=2, vmin=50, vmax=500)
+
+# xs = np.linspace(0, 60, 101)
+# plt.plot_simple_multi([xs, h_meds], [xs, uv_meds], ['equality', ''], ['r', 'k'],
+#     ['', 'o'], ['-', ''], [1, 1], xlabel='median Roman H band S/N < 5 Re',
+#     ylabel='median CASTOR UV S/N < 5 Re', ,
+#     scale='log')
+
+# xlo = h_meds - h_los
+# xhi = h_his - h_meds
+# ylo = uv_meds - uv_los
+# yhi = uv_his - uv_meds
+# plt.plot_scatter_err_both(h_meds, uv_meds, xlo, xhi, ylo, yhi,
+#     xlabel='Roman H band S/N < 5 Re', ylabel='CASTOR UV S/N< 5 Re')
+'''
+
+
+
+
+
+# waves, total, zodi, ism, stray, thermal = np.loadtxt(
+#     'background/background_JWST/minzodi_background.txt', unpack=True)
+# xs = [waves, waves, waves, waves, waves]
+# ys = [ism, stray, thermal, zodi, total]
+# labels = ['ISM', 'Stray light', 'Thermal', 'Zodi', 'Total']
+# colors = ['b', 'g', 'r', 'orange', 'k']
+# markers = ['']*5
+# styles = ['-']*5
+# alphas = np.ones(5)
+# plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
+#     xmin=1, xmax=26, ymin=0.008, ymax=1000)
+
+'''
+from astropy.modeling import models
+bb = models.BlackBody(temperature=2.7255*u.K) # from Fixsen 2009
+# https://ui.adsabs.harvard.edu/abs/2009ApJ...707..916F/abstract
+
+
+files = ['D:/Desktop/CASTOR_paper/IR_background_Spitzer+Herschel/background_minzodi_L2.tbl',
+         'D:/Desktop/CASTOR_paper/IR_background_Spitzer+Herschel/background_minzodi_LEO.tbl']
+for file in files[:1] :
+    data = np.loadtxt(file, dtype=str, skiprows=23).astype(float)
+    waves = data[:, 7]*u.um
+    nus = (c.c/waves).to(u.Hz)
+    zodi = data[:, 2]*u.MJy/u.sr
+    ism = data[:, 3]*u.MJy/u.sr
+    stars = data[:, 4]*u.MJy/u.sr
+    cib = data[:, 5]*u.MJy/u.sr
+    # totbg = data[:, 6]*u.MJy/u.sr
+    
+    # add in the contribution from the CMB
+    cmb = bb(waves).to(u.MJy/u.sr)
+    totbg = zodi+ism+stars+cib+cmb
+    
+    xs = [waves, waves, waves, waves, waves, waves]
+    ys = [zodi, ism, stars, cib, cmb, totbg]
+    labels = ['zodi', 'ism', 'stars', 'CIB', 'cmb', 'total']
+    colors = ['orange', 'b', 'gold', 'grey', 'r', 'k']
+    markers = ['']*6
+    styles = ['-']*6
+    alphas = [1]*6
+    # plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
+    #     xlabel=r'$\lambda$ ($\mu$m)', ylabel=r'MJy sr$^{-1}$',
+    #     ymin=0.001, ymax=1000, scale='log')
+    
+    ys = [(zodi*nus).to(u.W/u.m/u.m/u.sr), (ism*nus).to(u.W/u.m/u.m/u.sr),
+          (stars*nus).to(u.W/u.m/u.m/u.sr), (cib*nus).to(u.W/u.m/u.m/u.sr),
+          (cmb*nus).to(u.W/u.m/u.m/u.sr), (totbg*nus).to(u.W/u.m/u.m/u.sr)]
+    # plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
+    #     xlabel=r'$\lambda$ ($\mu$m)', ylabel=r'W m$^{-2}$ sr$^{-1}$',
+    #     ymin=1e-09, ymax=1e-05, scale='log')
+'''

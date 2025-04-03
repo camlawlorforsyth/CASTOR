@@ -3,6 +3,7 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 
+import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.colors as mcol
 from matplotlib.colors import LogNorm, Normalize
@@ -11,6 +12,9 @@ from matplotlib.patches import Circle
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 currentFig = 1
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = 'Times New Roman'
+mpl.rcParams['text.usetex'] = True
 
 def display_image_simple_with_contour(image, contour_image, levels, bad='black',
                                       cbar_label='', cmap=cm.viridis, vmin=None,
@@ -37,9 +41,10 @@ def display_image_simple_with_contour(image, contour_image, levels, bad='black',
     
     return
 
-def display_image_simple(data, bad='black', cbar_label='', cmap=cm.gray, 
+def display_image_simple(data, bad='black', cbar_label='', cmap=cm.inferno, 
                          vmin=None, vmax=None, figsizewidth=9, figsizeheight=9,
-                         lognorm=True, save=False, outfile=None) :
+                         lognorm=True, save=False, outfile=None, title=None,
+                         patches=None) :
     
     global currentFig
     fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
@@ -47,7 +52,7 @@ def display_image_simple(data, bad='black', cbar_label='', cmap=cm.gray,
     plt.clf()
     ax = fig.add_subplot(111)
     
-    cmap = cm.inferno #copy.copy(cmap) # cmap=cm.viridis,
+    cmap = copy.copy(cmap) # cmap=cm.inferno # cmap=cm.viridis,
     cmap.set_bad(bad, 1)
     
     if lognorm :
@@ -57,6 +62,12 @@ def display_image_simple(data, bad='black', cbar_label='', cmap=cm.gray,
         frame = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
     cbar = plt.colorbar(frame)
     cbar.set_label(cbar_label, fontsize=15)
+    
+    if patches is not None :
+        for patch in patches :
+            patch.plot(ax=ax, color='white', lw=0.5)
+    
+    ax.set_title(title, fontsize=18)
     
     plt.tight_layout()
     
@@ -70,7 +81,7 @@ def display_image_simple(data, bad='black', cbar_label='', cmap=cm.gray,
 
 def histogram(data, label, title=None, bins=None, log=False, histtype='step',
               vlines=[], colors=[], labels=[], loc='upper left',
-              figsizewidth=9.5, figsizeheight=7) :
+              figsizewidth=9.5, figsizeheight=7, save=False, outfile=None) :
     
     global currentFig
     fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
@@ -79,7 +90,7 @@ def histogram(data, label, title=None, bins=None, log=False, histtype='step',
     ax = fig.add_subplot(111)
     
     # if bins and not log :
-    ax.hist(data, bins=bins, color='k', histtype=histtype)
+    ax.hist(data, bins=bins, color='k', histtype=histtype, log=log)
     # elif bins and log :
     #     ax.hist(data, bins=bins, log=log, color='k', histtype=histtype)
     # elif log and not bins :
@@ -92,6 +103,7 @@ def histogram(data, label, title=None, bins=None, log=False, histtype='step',
     #         ax.axvline(vlines[i], ls='--', color=colors[i], lw=1, alpha=0.5,
     #                    label=labels[i])
     
+    ax.set_title(title, fontsize=18)
     ax.set_xlabel('{}'.format(label), fontsize = 15)    
     
     # if len(vlines) > 0 :
@@ -99,7 +111,12 @@ def histogram(data, label, title=None, bins=None, log=False, histtype='step',
     #               fontsize=15)
     
     plt.tight_layout()
-    plt.show()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
     
     return
 
@@ -761,23 +778,27 @@ def plot_scatter(xs, ys, color, label, marker, cbar_label='', size=30,
     plt.clf()
     ax = fig.add_subplot(111)
     
-    cmap = copy.copy(cmap)
-    norm = Normalize(vmin=vmin, vmax=vmax)
+    # cmap = copy.copy(cmap)
+    # norm = Normalize(vmin=vmin, vmax=vmax)
     
-    temp = np.linspace(xmin, xmax, 1000)
-    ax.plot(temp, temp, 'k-')
+    # temp = np.linspace(min(np.nanmin(xs), np.nanmin(ys)),
+    #                    max(np.nanmax(xs), np.nanmax(ys)), 1000)
+    # temp = np.linspace(xmin, xmax, 1000)
+    # ax.plot(temp, temp, 'k-')
     # ax.plot(temp, temp+0.5, 'k--')
     # ax.plot(temp, temp+1, 'k:')
     
-    frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
+    ax.scatter(xs, ys, c=color, marker='o', alpha=0.2)
+    
+    # frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
                         # edgecolors='grey',
-                       norm=norm, s=size, alpha=0.3)
+                       # norm=norm, s=size, alpha=0.3)
     # cbar = plt.colorbar(frame)
     # cbar.set_label(cbar_label, fontsize=15)
-    ax.plot(-5, -5, 'o', c=cmap(327), alpha=0.3, label='cluster')
-    ax.plot(-5, -5, 'o', c=cmap(170), alpha=0.3, label='high mass group')
-    ax.plot(-5, -5, 'o', c=cmap(100), alpha=0.3, label='low mass group')
-    ax.plot(-5, -5, 'o', c=cmap(0), alpha=0.3, label='field')
+    # ax.plot(-5, -5, 'o', c=cmap(327), alpha=0.3, label='cluster')
+    # ax.plot(-5, -5, 'o', c=cmap(170), alpha=0.3, label='high mass group')
+    # ax.plot(-5, -5, 'o', c=cmap(100), alpha=0.3, label='low mass group')
+    # ax.plot(-5, -5, 'o', c=cmap(0), alpha=0.3, label='field')
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -788,7 +809,7 @@ def plot_scatter(xs, ys, color, label, marker, cbar_label='', size=30,
     
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    # ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
     
     plt.tight_layout()
     
@@ -822,8 +843,8 @@ def plot_scatter_dumb(xs, ys, color, label, marker, cbar_label='', size=30,
     frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
                         # edgecolors='grey', norm=norm,
                        vmin=vmin, vmax=vmax, s=size, alpha=1, zorder=3)
-    # cbar = plt.colorbar(frame)
-    # cbar.set_label(cbar_label, fontsize=15)
+    cbar = plt.colorbar(frame)
+    cbar.set_label(cbar_label, fontsize=15)
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -861,6 +882,36 @@ def plot_scatter_err(xs, ys, lo, hi, xlabel=None, ylabel=None,
                 capsize=2)
     
     ax.axhline(50, c='grey', ls='--')
+    
+    ax.set_xlabel(xlabel, fontsize=15)
+    ax.set_ylabel(ylabel, fontsize=15)
+    
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    
+    plt.tight_layout()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
+    
+    return
+
+def plot_scatter_err_both(xs, ys, xlo, xhi, ylo, yhi, xlabel=None, ylabel=None,
+                          xmin=None, xmax=None, ymin=None, ymax=None,
+                          figsizewidth=9.5, figsizeheight=7, save=False,
+                          outfile=None) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    ax = fig.add_subplot(111)
+    
+    ax.errorbar(xs, ys, xerr=[xlo, xhi], yerr=[ylo, yhi], fmt='ko', ecolor='k',
+                elinewidth=0.5, capsize=2)
     
     ax.set_xlabel(xlabel, fontsize=15)
     ax.set_ylabel(ylabel, fontsize=15)
@@ -1083,6 +1134,147 @@ def plot_scatter_with_hists(xs, ys, colors, labels, markers, alphas,
     
     return
 
+def plot_sed(waves, sed, waves_phot, phot_model, phot, phot_e,
+             xlabel=None, ylabel=None, title=None,
+             xmin=0.13, xmax=3, ymin=0.1, ymax=10,
+             figsizewidth=12, figsizeheight=9, loc=4,
+             outfile=None, save=False) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    ax = fig.add_subplot(111)
+    
+    # ax.plot(waves, direct, color='r', marker='', ls=':', lw=3, alpha=0.3,
+    #         label='FAST++ output')
+    ax.plot(waves, sed, color='k', marker='', ls='-', alpha=0.3,
+            label='from SFH parameters')
+    ax.plot(waves_phot, phot_model, color='r', marker='s', ls='',
+            label='model flux', mfc='none', mew=2, ms=12)
+    # ax.plot(waves_phot, phot, color='b', marker='o', ls='',
+    #         label='observed flux', mfc='none', mew=2, ms=12)
+    ax.errorbar(waves_phot, phot, yerr=phot_e, xerr=None, color='b', marker='o',
+                ls='', label='observed flux', mfc='none', mew=2, ms=12,
+                ecolor='b', elinewidth=2)
+    
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
+    ax.set_title(title, fontsize=18)
+    ax.set_xlabel('wavelength (micron)', fontsize=15)
+    ax.set_ylabel(r'flux (10$^{-19}$ ergs s$^{-1}$ cm$^{-2}$ \AA$^{-1}$)',
+                  fontsize=15)
+    
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    
+    plt.tight_layout()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
+    
+    return
+
+def plot_seds(waves, seds, waves_phot, phot_model, phot, phot_e,
+              xlabel=None, ylabel=None, title=None,
+              xmin=0.13, xmax=3, ymin=0.1, ymax=10,
+              figsizewidth=12, figsizeheight=9, loc=4,
+              outfile=None, save=False) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    ax = fig.add_subplot(111)
+    
+    from matplotlib.collections import LineCollection
+    
+    colors = cm.magma(np.arange(len(seds))/len(seds))
+    # colors = cm.magma(np.arange(3)/3).tolist() + [[0, 0, 1, 1]]
+    # labels = ['constructed', 'FAST++ output'] + ['']*(len(seds) - 2)
+    labels = ['']*len(seds)
+    # labels = ['bestfit (extended parameter space)',
+    #           'previous bestfit (limited parameter space)',
+    #           r'best $Z = Z_{\odot}$ fit'] + ['']*(len(seds) - 3)
+    # ls = ['--', '-', '-', '-']
+    # al = [0.3, 0.3, 0.3, 0.5]
+    # ax.plot(waves, direct, color='r', marker='', ls=':', lw=3, alpha=0.3,
+    #         label='FAST++ output')
+    for i in range(len(seds)) :
+        # [ax.plot(waves[10*j:10*(j+1)+1], seds[i][10*j:10*(j+1)+1],
+        #  alpha=np.max([0.7-0.015*j, 0.25]), color=colors[i], marker='', ls='-')
+        #  for j in range(int(len(waves)/10))]
+        ax.plot(waves, seds[i], color=colors[i], marker='', ls='-', alpha=0.3,
+                label=labels[i])
+    ax.plot(waves_phot, phot_model, color='r', marker='s', ls='',
+            label='model flux', mfc='none', mew=2, ms=12)
+    # ax.plot(waves_phot, phot, color='b', marker='o', ls='',
+    #         label='observed flux', mfc='none', mew=2, ms=12)
+    ax.errorbar(waves_phot, phot, yerr=phot_e, xerr=None, color='b', marker='o',
+                ls='', label='observed flux', mfc='none', mew=2, ms=12,
+                ecolor='b', elinewidth=2)
+    
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
+    ax.set_title(title, fontsize=18)
+    ax.set_xlabel('wavelength (micron)', fontsize=15)
+    ax.set_ylabel(r'flux (10$^{-19}$ ergs s$^{-1}$ cm$^{-2}$ \AA$^{-1}$)',
+                  fontsize=15)
+    
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    
+    plt.tight_layout()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
+    
+    return
+
+def plot_sfhs_comparison(xs, ys, time, data, centers,
+                         xlabel=None, ylabel=None,
+                         xmin=None, xmax=None, ymin=None, ymax=None,
+                         figsizewidth=9.5, figsizeheight=7, loc=0) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    ax = fig.add_subplot(111)
+    
+    ax.plot(xs, ys, 'k-')
+    ax.axvline(time, color='k', ls=':', label='observation', alpha=0.5)
+    
+    colors = cm.hot(np.arange(len(data))/len(data))
+    for i in range(len(data)) :
+        if i in [0, len(data) - 1] :
+            label = 'bin {}'.format(i)
+        else :
+            label = ''
+        ax.plot(centers, data[i], color=colors[i], ls='--', label=label)
+    
+    ax.set_xlabel(xlabel, fontsize=15)
+    ax.set_ylabel(ylabel, fontsize=15)
+    
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return
+
 def plot_simple_dumb(xs, ys, label='', save=False,
                      xlabel=None, ylabel=None, title=None, outfile=None,
                      xmin=None, xmax=None, ymin=None, ymax=None, loc=0,
@@ -1125,17 +1317,19 @@ def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
                       xlabel=None, ylabel=None, title=None,
                       xmin=None, xmax=None, ymin=None, ymax=None,
                       figsizewidth=9.5, figsizeheight=7, scale='linear', loc=0,
-                      outfile=None, save=False) :
+                      outfile=None, save=False, ms=6) :
     
     global currentFig
     fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
     currentFig += 1
     plt.clf()
     ax = fig.add_subplot(111)
-    # lws = [2, 4]
+    
     for i in range(len(xs)) :
         ax.plot(xs[i], ys[i], marker=markers[i], linestyle=styles[i],
-                color=colors[i], label=labels[i], alpha=alphas[i])
+                color=colors[i], label=labels[i], alpha=alphas[i], ms=ms,
+                # mfc='none',
+                mec=colors[i], mew=2)
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -1159,43 +1353,92 @@ def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
     
     return
 
-def plot_multi_vertical_error(xs, ys, lo, hi, labels, colors, markers, styles,
+def plot_stairs(values, edges) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(9.5, 7))
+    currentFig += 1
+    plt.clf()
+    ax = fig.add_subplot(111)
+    
+    ax.stairs(values, edges, color='k', baseline=None)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return
+
+def plot_multi_vertical_error(xs, ys, labels, colors, markers, styles,
                               reg, xlabel=None, ylabel1=None, ylabel2=None,
-                              xmin=None, xmax=None, ymin1=None, ymax1=None,
-                              ymin2=None, ymax2=None, figsizewidth=9.5,
-                              figsizeheight=7, loc=0, save=False, outfile=None) :
+                              ylabel3=None, xmin=None, xmax=None, ymin1=None,
+                              ymax1=None, ymin2=None, ymax2=None, ymin3=None,
+                              ymax3=None, figsizewidth=9.5, figsizeheight=9.5,
+                              loc=0, save=False, outfile=None, title=None) :
     
     global currentFig
     fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
     currentFig += 1
     plt.clf()
     
-    gs = fig.add_gridspec(2, 1, hspace=0)
+    gs = fig.add_gridspec(3, 1, hspace=0)
     ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[1, 0])
+    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    ax3 = fig.add_subplot(gs[2, 0], sharex=ax1)
+    
+    alphas = [0.5, 0.65, 1]*3
+    lws = [1.25, 1.5, 2.5]*3
+    # alphas = [0.5, 0.65]*3
+    # lws = [1.25, 1.5]*3
     
     for i in range(reg) :
-        ax1.errorbar(xs[i], ys[i], yerr=[lo[i], hi[i]], marker=markers[i],
+        ax1.plot(xs[i], ys[i], #yerr=[lo[i], hi[i]],
+                     marker=markers[i],
                      linestyle=styles[i], color=colors[i], label=labels[i],
-                     ecolor='lightgray', elinewidth=1.5)
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
     
-    for i in range(reg, len(xs)) :
-        ax2.errorbar(xs[i], ys[i], yerr=[lo[i], hi[i]], marker=markers[i],
+    for i in range(reg, 2*reg) :
+        ax2.plot(xs[i], ys[i], #yerr=[lo[i], hi[i]],
+                     marker=markers[i],
                      linestyle=styles[i], color=colors[i], label=labels[i],
-                     ecolor='lightgray', elinewidth=1.5)
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
     
-    ax2.set_xlabel(xlabel, fontsize=15)
-    ax1.set_ylabel(ylabel1, fontsize=15)
-    ax2.set_ylabel(ylabel2, fontsize=15)
+    for i in range(2*reg, len(xs)) :
+        ax3.plot(xs[i], ys[i], #yerr=[lo[i], hi[i]],
+                     marker=markers[i],
+                     linestyle=styles[i], color=colors[i], label=labels[i],
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
     
-    ax1.set_xlim(xmin, xmax)
+    ax1.tick_params(bottom=False, labelbottom=False)
+    ax2.tick_params(bottom=False, labelbottom=False)
+    
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    ax3.set_yscale('log')
+    
+    ax1.set_title(title, fontsize=10)
+    ax3.set_xlabel(xlabel, fontsize=10)
+    ax1.set_ylabel(ylabel1, fontsize=10)
+    ax2.set_ylabel(ylabel2, fontsize=10)
+    ax3.set_ylabel(ylabel3, fontsize=10)
+    
+    ax2.set_xlim(xmin, xmax)
     ax1.set_ylim(ymin1, ymax1)
     ax2.set_ylim(ymin2, ymax2)
+    ax3.set_ylim(ymin3, ymax3)
+    
+    if ax2.get_ylim()[0] < 1e-10 :
+        ax2.set_ylim(1e-10, ymax2)
+    
+    if ax3.get_ylim()[0] < 1e-15 :
+        ax3.set_ylim(1e-15, ymax3)
     
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     
-    ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=15,
+    ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=10,
                facecolor='whitesmoke', framealpha=1, loc=loc)
     
     plt.tight_layout()
