@@ -136,7 +136,8 @@ def concatenate_all_fits(save=True) :
     
     return
 
-def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18) :
+def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18,
+                        surfacedensity=True) :
     
     # determine the projected physical area of every circular annulus
     with fits.open('GALAXEV/40_299910_z_{:03}_idealized_extincted.fits'.format(
@@ -161,15 +162,19 @@ def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18) :
     lmass_profile = np.power(10, data[:, 5].astype(float)[use])
     lsfr_profile = np.power(10, data[:, 14].astype(float)[use]) # sfr100
     
-    # convert stellar masses to surface mass densities
-    fast_Sigma = lmass_profile/physical_area_profile.value
-    
-    # convert star formation rates to surface star formation rate densities
-    fast_Sigma_SFR = lsfr_profile/physical_area_profile.value
+    if surfacedensity :
+        # convert stellar masses to surface mass densities
+        fast_Sigma = lmass_profile/physical_area_profile.value
+        
+        # convert star formation rates to surface star formation rate densities
+        fast_Sigma_SFR = lsfr_profile/physical_area_profile.value
+    else :
+        fast_Sigma = lmass_profile
+        fast_Sigma_SFR = lsfr_profile
     
     return fast_Sigma, fast_Sigma_SFR, fast_Sigma_SFR/fast_Sigma
 
-def get_tng_profiles(subID, snap, Re) :
+def get_tng_profiles(subID, snap, Re, surfacedensity=True) :
     
     # get galaxy location in the massive sample
     loc = load_galaxy_attributes_massive(subID, snap, loc_only=True)
@@ -187,10 +192,14 @@ def get_tng_profiles(subID, snap, Re) :
     for i, (start, end) in enumerate(zip(edges, edges[1:])) :
         tng_area_profile[i] = np.pi*(np.square(end*Re) - np.square(start*Re))
     
-    # convert stellar masses to surface mass densities
-    tng_Sigma = mass_profiles[loc, snap]/tng_area_profile
-    
-    # convert star formation rates to surface star formation rate densities
-    tng_Sigma_SFR = SFR_profiles[loc, snap]/tng_area_profile
+    if surfacedensity :
+        # convert stellar masses to surface mass densities
+        tng_Sigma = mass_profiles[loc, snap]/tng_area_profile
+        
+        # convert star formation rates to surface star formation rate densities
+        tng_Sigma_SFR = SFR_profiles[loc, snap]/tng_area_profile
+    else :
+        tng_Sigma = mass_profiles[loc, snap]
+        tng_Sigma_SFR = SFR_profiles[loc, snap]
     
     return tng_Sigma, tng_Sigma_SFR, sSFR_profiles[loc, snap]
