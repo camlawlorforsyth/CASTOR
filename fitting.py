@@ -48,7 +48,7 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
     
     # get the profiles from TNG
     tng_Sigma, tng_Sigma_SFR, tng_Sigma_sSFR = get_tng_profiles(
-        subIDfinal, snap, Re)
+        subIDfinal, snap, Re=Re)
     
     # get the fitted profiles from FAST++, which uses a delayed tau model
     # with an additional burst/truncation in the final 100 Myr
@@ -139,16 +139,6 @@ def concatenate_all_fits(save=True) :
 def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18,
                         surfacedensity=True) :
     
-    # determine the projected physical area of every circular annulus
-    with fits.open('GALAXEV/40_299910_z_{:03}_idealized_extincted.fits'.format(
-        str(model_redshift).replace('.', ''))) as hdu :
-        plate_scale = hdu[0].header['CDELT1']*u.arcsec/u.pix
-    kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(model_redshift).to(u.kpc/u.arcsec)
-    pixel_area_physical = np.square(kpc_per_arcsec)*np.square(plate_scale*u.pix)
-    nPixel_profile = Table.read(
-        'photometry/{}_{}_photometry.fits'.format(snap, subID))['nPix'].value
-    physical_area_profile = pixel_area_physical*nPixel_profile[:20]
-    
     # load fitted data coming out of FAST++
     data = np.loadtxt('fits/fits_2April2025.fout', dtype=str, skiprows=skiprows)
     
@@ -159,22 +149,32 @@ def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18,
     use[np.where(use)[0][-2:]] = False # account for 1 kpc and integrated bins
     
     # get the stellar mass and star formation rates
-    lmass_profile = np.power(10, data[:, 5].astype(float)[use])
-    lsfr_profile = np.power(10, data[:, 14].astype(float)[use]) # sfr100
+    mass_profile = np.power(10, data[:, 5].astype(float)[use])
+    sfr_profile = np.power(10, data[:, 14].astype(float)[use]) # sfr100
     
     if surfacedensity :
+        # determine the projected physical area of every circular annulus
+        with fits.open('GALAXEV/40_299910_z_{:03}_idealized_extincted.fits'.format(
+            str(model_redshift).replace('.', ''))) as hdu :
+            plate_scale = hdu[0].header['CDELT1']*u.arcsec/u.pix
+        kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(model_redshift).to(u.kpc/u.arcsec)
+        pixel_area_physical = np.square(kpc_per_arcsec)*np.square(plate_scale*u.pix)
+        nPixel_profile = Table.read(
+            'photometry/{}_{}_photometry.fits'.format(snap, subID))['nPix'].value
+        physical_area_profile = pixel_area_physical*nPixel_profile[:20]
+        
         # convert stellar masses to surface mass densities
-        fast_Sigma = lmass_profile/physical_area_profile.value
+        fast_Sigma = mass_profile/physical_area_profile.value
         
         # convert star formation rates to surface star formation rate densities
-        fast_Sigma_SFR = lsfr_profile/physical_area_profile.value
+        fast_Sigma_SFR = sfr_profile/physical_area_profile.value
     else :
-        fast_Sigma = lmass_profile
-        fast_Sigma_SFR = lsfr_profile
+        fast_Sigma = mass_profile
+        fast_Sigma_SFR = sfr_profile
     
     return fast_Sigma, fast_Sigma_SFR, fast_Sigma_SFR/fast_Sigma
 
-def get_tng_profiles(subID, snap, Re, surfacedensity=True) :
+def get_tng_profiles(subID, snap, Re=1.0, surfacedensity=True) :
     
     # get galaxy location in the massive sample
     loc = load_galaxy_attributes_massive(subID, snap, loc_only=True)
@@ -187,12 +187,12 @@ def get_tng_profiles(subID, snap, Re, surfacedensity=True) :
         SFR_profiles = hf['SFR_profiles'][:]   # (1666, 100, 20)
         sSFR_profiles = hf['sSFR_profiles'][:] # (1666, 100, 20)
     
-    # determine the area for the raw TNG computed profiles
-    tng_area_profile = np.full(20, np.nan)
-    for i, (start, end) in enumerate(zip(edges, edges[1:])) :
-        tng_area_profile[i] = np.pi*(np.square(end*Re) - np.square(start*Re))
-    
     if surfacedensity :
+        # determine the area for the raw TNG computed profiles
+        tng_area_profile = np.full(20, np.nan)
+        for i, (start, end) in enumerate(zip(edges, edges[1:])) :
+            tng_area_profile[i] = np.pi*(np.square(end*Re) - np.square(start*Re))
+        
         # convert stellar masses to surface mass densities
         tng_Sigma = mass_profiles[loc, snap]/tng_area_profile
         
