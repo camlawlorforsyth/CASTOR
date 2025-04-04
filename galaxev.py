@@ -231,7 +231,7 @@ def determine_magnitudes(model_redshift=0.5) :
         str(model_redshift).replace('.', ''))
     
     # read the saved input from the Bruzual & Charlot (2003) models
-    datacube, metallicities, stellar_ages, wavelengths = read_bc03()
+    datacube, metallicities, stellar_ages, wavelengths, masses = read_bc03()
     num_metallicities = len(metallicities)
     num_stellar_ages = len(stellar_ages)
     
@@ -347,6 +347,10 @@ def read_bc03() :
         # metallicity+age combination
         datacube = np.zeros((num_metallicities, num_stellar_ages, num_wavelengths))
         
+        # create a mass cube which will hold the remaining stellar mass for
+        # every metallicity+age combination
+        masses = np.zeros((num_metallicities, num_stellar_ages))
+        
         for k in range(num_metallicities) :
             infile = inDir + 'bc2003_lr_BaSeL_m{}_chab_ssp.ised_ASCII'.format(
                 metallicity_ids[k])
@@ -371,7 +375,10 @@ def read_bc03() :
                     datacube[k, j, :] = cur_sed[:num_wavelengths]
                 
                 # there are 12 more lines after this (with 221 values per line)
-                # that we don't need
+                # that we don't need, though the remaining stellar mass is on
+                # the second (index 1) line of these 12 lines
+                f.readline()
+                masses[k] = np.array(f.readline().split()[1:], dtype=np.float64)
         
         # save the file for faster loading in future
         with h5py.File(datacube_file, 'w') as hf :
@@ -379,9 +386,7 @@ def read_bc03() :
             hf.create_dataset('metallicities', data=metallicities)
             hf.create_dataset('stellar_ages', data=stellar_ages)
             hf.create_dataset('wavelengths', data=wavelengths)
-        # np.savez(datacube_file, datacube=datacube, metallicities=metallicities,
-        #          stellar_ages=stellar_ages, wavelengths=wavelengths)
-    
+            hf.create_dataset('masses', data=masses)
     else :
         # load the saved arrays
         with h5py.File(datacube_file, 'r') as hf :
@@ -389,10 +394,6 @@ def read_bc03() :
             metallicities = hf['metallicities'][:]
             stellar_ages = hf['stellar_ages'][:]
             wavelengths = hf['wavelengths'][:]
-        # with np.load(datacube_file) as npz :
-        #     datacube = npz['datacube']
-        #     metallicities = npz['metallicities']
-        #     stellar_ages = npz['stellar_ages']
-        #     wavelengths = npz['wavelengths']
+            masses = hf['masses'][:]
     
-    return datacube, metallicities, stellar_ages, wavelengths
+    return datacube, metallicities, stellar_ages, wavelengths, masses

@@ -1385,10 +1385,10 @@ def plot_multi_vertical_error(xs, ys, labels, colors, markers, styles,
     ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
     ax3 = fig.add_subplot(gs[2, 0], sharex=ax1)
     
-    alphas = [0.5, 0.65, 1]*3
-    lws = [1.25, 1.5, 2.5]*3
-    # alphas = [0.5, 0.65]*3
-    # lws = [1.25, 1.5]*3
+    # alphas = [0.5, 0.65, 1]*3
+    # lws = [1.25, 1.5, 2.5]*3
+    alphas = [0.5, 0.65]*3
+    lws = [1.25, 1.5]*3
     
     for i in range(reg) :
         ax1.plot(xs[i], ys[i], #yerr=[lo[i], hi[i]],

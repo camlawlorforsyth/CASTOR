@@ -421,6 +421,25 @@ def noll2009(waves, eb, delta) :
     
     return corr
 
+def resave_bc03_libraries_in_fastpp_format() :
+    
+    import h5py; from astropy.table import Table
+    with h5py.File('tools/bc03_2016.hdf5', 'r') as hf :
+        datacube = hf['datacube'][:]
+        metallicities = hf['metallicities'][:]
+        stellar_ages = hf['stellar_ages'][:]
+        wavelengths = hf['wavelengths'][:]
+        masses = hf['masses'][:]
+    
+    # loop every metallicity, saving the resultant table to file
+    for i, metallicity in enumerate(metallicities) :
+        t = Table([[stellar_ages], [masses[i]], [wavelengths], [datacube[i]]],
+                  names=('AGE', 'MASS', 'LAMBDA', 'SED'))
+        t.write('bc03_lr_ch_z{}.ised_ASCII.fits'.format(
+            str(metallicity).split('.')[1]))
+    
+    return
+
 def sfh2sed_fastpp(metal, tobs, ts, sfh) :
     # from FAST++
     # https://github.com/cschreib/fastpp/blob/master/src/fast%2B%2B-sfh2sed.cpp#L130-L142
@@ -441,7 +460,7 @@ def sfh2sed_fastpp(metal, tobs, ts, sfh) :
     return tpl_flux
 
 def compare_dust_laws() :
-
+    
     waves = np.linspace(0.1, 0.9, 10001) # [um]
     C00 = calzetti2000(waves)
     C89 = cardelli1989(waves)
