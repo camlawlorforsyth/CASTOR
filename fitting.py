@@ -13,7 +13,7 @@ import plotting as plt
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
 
-def compare_all_fits() :
+def compare_all_fits(model_redshift=0.5) :
     
     # get the entire massive sample, including both quenched galaxies and
     # comparison/control star forming galaxies
@@ -37,9 +37,11 @@ def compare_all_fits() :
     # process every galaxy/snapshot pair
     for subIDfinal, subID, snap, logM, Re in zip(sample['subIDfinal'],
         sample['subID'], sample['snapshot'], sample['logM'], sample['Re']) :
-        outfile = 'figures/radial_profiles_GALAXEV/{}_{}.pdf'.format(snap, subID)
+        outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
+            snap, subID, str(model_redshift).replace('.', ''))
         if not exists(outfile) :
-            compare_fits_to_tng(subIDfinal, snap, subID, logM, Re)
+            compare_fits_to_tng(subIDfinal, snap, subID, logM, Re,
+                model_redshift=model_redshift)
         print('snap {} subID {} done'.format(snap, subID))
     
     return
@@ -83,7 +85,8 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
     colors = ['r', 'r', 'b', 'b', 'k', 'k']
     markers = ['', '', '', '', '', '']
     styles = ['-', '--', '-', '--', '-', '--']
-    outfile = 'figures/radial_profiles_GALAXEV/{}_{}.pdf'.format(snap, subID)
+    outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
+        snap, subID, str(model_redshift).replace('.', ''))
     plt.plot_multi_vertical_error(xs, ys, labels, colors, markers, styles, 2,
         xlabel=r'$R/R_{\rm e}$',
         ylabel1=r'$\Sigma_{*}/{\rm M}_{\odot}~{\rm kpc}^{-2}$',
@@ -97,7 +100,7 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
     
     return
 
-def concatenate_all_fits(save=True) :
+def concatenate_all_fits(model_redshift=0.5, save=True) :
     
     # get the entire massive sample, including both quenched galaxies and
     # comparison/control star forming galaxies
@@ -128,8 +131,8 @@ def concatenate_all_fits(save=True) :
             subIDs = sample['subID'][sample['mechanism'] == mechanism]
             snaps = sample['snapshot'][sample['mechanism'] == mechanism]
             for subID, snap in zip(subIDs, snaps) :
-                outfile = 'figures/radial_profiles_GALAXEV/{}_{}.pdf'.format(
-                    snap, subID)
+                outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
+                    snap, subID, str(model_redshift).replace('.', ''))
                 merger.append(outfile)
             merger.write('figures/radial_profiles_GALAXEV/{}.pdf'.format(label))
             merger.close()

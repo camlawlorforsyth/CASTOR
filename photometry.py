@@ -12,7 +12,7 @@ from core import load_massive_galaxy_sample
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
 
-def determine_all_photometry() :
+def determine_all_photometry(model_redshift=0.5) :
     
     # get the entire massive sample, including both quenched galaxies and
     # comparison/control star forming galaxies
@@ -35,9 +35,11 @@ def determine_all_photometry() :
     
     # process every galaxy/snapshot pair
     for subID, snap, Re in zip(sample['subID'], sample['snapshot'], sample['Re']) :
-        outfile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
+        outfile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
+            str(model_redshift).replace('.', ''))
         if not os.path.exists(outfile) :
-            determine_photometry_circular_annuli(snap, subID, Re)
+            determine_photometry_circular_annuli(snap, subID, Re,
+                model_redshift=model_redshift)
         print('snap {} subID {} done'.format(snap, subID))
     
     return
@@ -148,7 +150,8 @@ def determine_photometry_circular_annuli(snap, subID, Re, model_redshift=0.5,
         os.makedirs('photometry/', exist_ok=True) # ensure the output directory
             # for the photometric tables is available
         
-        outfile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
+        outfile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
+            str(model_redshift).replace('.', ''))
         photometry.write(outfile)
     
     return
@@ -215,7 +218,8 @@ def join_all_photometry(model_redshift=0.5, save=True) :
     tables_to_stack = []
     for subID, snap in zip(sample['subID'], sample['snapshot']) :
         # get the photometry for an individual galaxy
-        infile = 'photometry/{}_{}_photometry.fits'.format(snap, subID)
+        infile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
+            str(model_redshift).replace('.', ''))
         table = Table.read(infile)
         
         # get photometry from the table, and include additional redshift info

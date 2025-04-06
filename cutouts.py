@@ -36,7 +36,8 @@ def create_all_mocks(model_redshift=0.5, psf=0.15*u.arcsec) :
         outfile = 'cutouts/{}_{}_z_{:03}.fits'.format(snap, subID,
             str(model_redshift).replace('.', ''))
         if not os.path.exists(outfile) :
-            create_mock_observations(snap, subID, psf=psf)
+            create_mock_observations(snap, subID, psf=psf,
+                model_redshift=model_redshift)
         print('snap {} subID {} done'.format(snap, subID))
     
     return
