@@ -134,7 +134,8 @@ def concatenate_all_fits(model_redshift=0.5, save=True) :
                 outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
                     snap, subID, str(model_redshift).replace('.', ''))
                 merger.append(outfile)
-            merger.write('figures/radial_profiles_GALAXEV/{}.pdf'.format(label))
+            merger.write('figures/radial_profiles_GALAXEV/{}_z_{:03}.pdf'.format(
+                label, str(model_redshift).replace('.', '')))
             merger.close()
     
     return
@@ -157,13 +158,14 @@ def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18,
     
     if surfacedensity :
         # determine the projected physical area of every circular annulus
-        with fits.open('GALAXEV/40_299910_z_{:03}_idealized_extincted.fits'.format(
-            str(model_redshift).replace('.', ''))) as hdu :
+        with fits.open('GALAXEV/{}_{}_z_{:03}_idealized_extincted.fits'.format(
+            snap, subID, str(model_redshift).replace('.', ''))) as hdu :
             plate_scale = hdu[0].header['CDELT1']*u.arcsec/u.pix
         kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(model_redshift).to(u.kpc/u.arcsec)
         pixel_area_physical = np.square(kpc_per_arcsec)*np.square(plate_scale*u.pix)
         nPixel_profile = Table.read(
-            'photometry/{}_{}_photometry.fits'.format(snap, subID))['nPix'].value
+            'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
+            str(model_redshift).replace('.', '')))['nPix'].value
         physical_area_profile = pixel_area_physical*nPixel_profile[:20]
         
         # convert stellar masses to surface mass densities
@@ -184,7 +186,7 @@ def get_tng_profiles(subID, snap, Re=1.0, surfacedensity=True) :
     
     # get the information about the raw radial profiles from TNG
     with h5py.File('D:/Documents/GitHub/TNG/TNG50-1/' +
-                   'TNG50-1_99_massive_radial_profiles(t)_2D.hdf5', 'r') as hf :
+        'TNG50-1_99_massive_radial_profiles(t)_2D.hdf5', 'r') as hf :
         edges = hf['edges'][:] # units of Re
         mass_profiles = hf['mass_profiles'][:] # (1666, 100, 20)
         SFR_profiles = hf['SFR_profiles'][:]   # (1666, 100, 20)

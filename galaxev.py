@@ -170,8 +170,8 @@ def create_idealized_image(snap, subID, logM, SFR, Re, center, sim_redshift,
     
     # create an extinction cube which describes the coefficients/factors which
     # will produce extincted images when multiplied with the idealized images
-    extinction = np.zeros((num_filters, nPix, nPix))
-    for i in range(num_filters) :
+    extinction = np.zeros((num_filters, nPix, nPix)) # [], ie. dimensionless
+    for i in range(num_filters) :                    # as a number in [0, 1]
         extinction[i, :, :] = lookup_table[:, i+1][locs].reshape((nPix, nPix))
     
     # store the idealized images into an array

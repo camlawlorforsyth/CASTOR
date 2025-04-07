@@ -783,8 +783,8 @@ def plot_scatter(xs, ys, color, label, marker, cbar_label='', size=30,
     
     # temp = np.linspace(min(np.nanmin(xs), np.nanmin(ys)),
     #                    max(np.nanmax(xs), np.nanmax(ys)), 1000)
-    # temp = np.linspace(xmin, xmax, 1000)
-    # ax.plot(temp, temp, 'k-')
+    temp = np.linspace(xmin, xmax, 1000)
+    ax.plot(temp, temp, 'k-')
     # ax.plot(temp, temp+0.5, 'k--')
     # ax.plot(temp, temp+1, 'k:')
     
@@ -842,7 +842,7 @@ def plot_scatter_dumb(xs, ys, color, label, marker, cbar_label='', size=30,
     ax.plot(xx, xx, 'k-', label='equality')
     frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
                         # edgecolors='grey', norm=norm,
-                       vmin=vmin, vmax=vmax, s=size, alpha=1, zorder=3)
+                       vmin=vmin, vmax=vmax, s=size, alpha=0.5, zorder=3)
     cbar = plt.colorbar(frame)
     cbar.set_label(cbar_label, fontsize=15)
     

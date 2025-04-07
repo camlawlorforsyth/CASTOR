@@ -136,7 +136,7 @@ def determine_photometry_circular_annuli(snap, subID, Re, model_redshift=0.5,
     photometry['nPix'] = nPixel_profile
     
     # add the redshift into the table
-    photometry['z_spec'] = np.full_like(pixel, model_redshift)
+    photometry['z_spec'] = np.full_like(nPixel_profile, model_redshift)
     
     # sort the table according to distance from the center of the image
     # sort = np.argsort(photometry['distance'].data)
