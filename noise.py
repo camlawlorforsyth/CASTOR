@@ -576,14 +576,14 @@ for file in files[:1] :
     markers = ['']*6
     styles = ['-']*6
     alphas = [1]*6
-    # plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
-    #     xlabel=r'$\lambda$ ($\mu$m)', ylabel=r'MJy sr$^{-1}$',
-    #     ymin=0.001, ymax=1000, scale='log')
+    plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
+        xlabel=r'$lambda$ ($mu$m)', ylabel=r'MJy sr$^{-1}$',
+        ymin=0.001, ymax=1000, scale='log')
     
     ys = [(zodi*nus).to(u.W/u.m/u.m/u.sr), (ism*nus).to(u.W/u.m/u.m/u.sr),
           (stars*nus).to(u.W/u.m/u.m/u.sr), (cib*nus).to(u.W/u.m/u.m/u.sr),
           (cmb*nus).to(u.W/u.m/u.m/u.sr), (totbg*nus).to(u.W/u.m/u.m/u.sr)]
     # plt.plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
-    #     xlabel=r'$\lambda$ ($\mu$m)', ylabel=r'W m$^{-2}$ sr$^{-1}$',
+    #     xlabel=r'$lambda$ ($mu$m)', ylabel=r'W m$^{-2}$ sr$^{-1}$',
     #     ymin=1e-09, ymax=1e-05, scale='log')
 '''

@@ -1,18 +1,14 @@
 
 import numpy as np
 
-import astropy.constants as c
 from astropy.cosmology import FlatLambdaCDM
 from astropy.io import fits
 from astropy.table import Table
 import astropy.units as u
-from photutils.aperture import CircularAnnulus, CircularAperture
-from scipy.optimize import curve_fit
 
-from core import get_rotation_input, load_galaxy_attributes_massive, open_cutout
+from core import get_rotation_input, load_galaxy_attributes_massive
 from fastpy import (calculate_chi2, calzetti2000, dtt_from_fit, get_bc03_waves,
-                    get_filter_waves, get_lum2fl, get_model_fluxes, get_times,
-                    sfh2sed_fastpp)
+                    get_lum2fl, get_model_fluxes, get_times, sfh2sed_fastpp)
 import plotting as plt
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
