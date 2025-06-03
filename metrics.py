@@ -21,42 +21,12 @@ from photutils.segmentation import detect_threshold, detect_sources
 from core import load_massive_galaxy_sample#, open_cutout
 # from fitting import get_fastpp_profiles, get_tng_profiles
 import plotting as plt
-from photometry import determine_castor_snr_map, determine_roman_snr_map
 
 cosmo = FlatLambdaCDM(H0=67.74, Om0=0.3089, Ob0=0.0486) # the TNG cosmology
 
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 warnings.filterwarnings('ignore', category=UserWarning)
-
-def create_radial_profile(image, Re_pix, center, pixel_area_physical,
-                          Nannuli=20, surfacedensity=True) :
-    
-    # get the edges of the circular annuli in units of pixels for masking,
-    # along with the bin centers for plotting
-    edges_pix = np.linspace(0, 5, Nannuli+1)*Re_pix # [Re]
-    # radial_bin_centers = edges_pix[:-1] + np.diff(edges_pix)/2 # [Re]
-    
-    profile = np.full(Nannuli, -1.0)
-    nPixels = np.full(Nannuli, -1.0)
-    for i, (start, end) in enumerate(zip(edges_pix, edges_pix[1:])) :
-        if start == 0 :
-            ap = CircularAperture(center, end)
-        else :
-            ap = CircularAnnulus(center, start, end)
-        profile[i] = ap.do_photometry(image)[0][0]
-        nPixels[i] = ap.area # the pixel areas per annulus
-    physical_areas = pixel_area_physical*nPixels # [kpc2]
-    
-    # plt.plot_simple_dumb(radial_bin_centers/Re_pix,
-    #     np.log10(profile/physical_areas.value), xmin=0, xmax=5)
-    
-    if surfacedensity :
-        profile = profile/physical_areas.value
-    
-    return profile
-
-
 
 def mass_to_light_ratio_circular_annuli(model_redshift=0.5) :
     
@@ -962,24 +932,3 @@ def quad(xx, aa, bb, cc) :
 
 # mass_to_light_ratio_circular_annuli()
 # all_metrics()
-
-# import warnings
-# warnings.filterwarnings('ignore', category=RuntimeWarning)
-# warnings.filterwarnings('ignore', category=UserWarning)
-
-# from photutils.aperture import CircularAnnulus, CircularAperture
-# from photutils.profiles import CurveOfGrowth, RadialProfile
-
-# plate_scale = hdu[0].header['CDELT1']*u.arcsec/u.pix
-
-# convert Re into pixels
-# Re_pix = (Re*u.kpc*cosmo.arcsec_per_kpc_proper(model_redshift)/plate_scale).value
-# kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(model_redshift).to(u.kpc/u.arcsec)
-# pixel_area_physical = np.square(kpc_per_arcsec)*np.square(plate_scale*u.pix)
-
-# determine the center of the image
-# center = (int((images.shape[1] - 1)/2), int((images.shape[2] - 1)/2))
-
-# mass_prof = create_radial_profile(mass_image, Re_pix, center, pixel_area_physical)
-# sfr_prof = create_radial_profile(sfr_image, Re_pix, center, pixel_area_physical)
-
