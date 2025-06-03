@@ -783,12 +783,12 @@ def plot_scatter(xs, ys, color, label, marker, cbar_label='', size=30,
     
     # temp = np.linspace(min(np.nanmin(xs), np.nanmin(ys)),
     #                    max(np.nanmax(xs), np.nanmax(ys)), 1000)
-    temp = np.linspace(xmin, xmax, 1000)
-    ax.plot(temp, temp, 'k-')
+    # temp = np.linspace(xmin, xmax, 1000)
+    # ax.plot(temp, temp, 'k-')
     # ax.plot(temp, temp+0.5, 'k--')
     # ax.plot(temp, temp+1, 'k:')
     
-    ax.scatter(xs, ys, c=color, marker='o', alpha=0.2)
+    ax.scatter(xs, ys, c=color, marker=marker, alpha=0.2)
     
     # frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
                         # edgecolors='grey',
@@ -837,7 +837,7 @@ def plot_scatter_dumb(xs, ys, color, label, marker, cbar_label='', size=30,
     # norm = Normalize(vmin=vmin, vmax=vmax)
     
     if (xmin is None) and (xmax is None) :
-        xmin, xmax = np.min(xs), np.max(xs)
+        xmin, xmax = np.nanmin(xs), np.nanmax(xs)
     xx = np.linspace(xmin, xmax, 1000)
     ax.plot(xx, xx, 'k-', label='equality')
     frame = ax.scatter(xs, ys, c=color, marker=marker, label=label, cmap=cmap,
@@ -855,7 +855,7 @@ def plot_scatter_dumb(xs, ys, color, label, marker, cbar_label='', size=30,
     
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    # ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
     
     plt.tight_layout()
     
@@ -1289,7 +1289,7 @@ def plot_simple_dumb(xs, ys, label='', save=False,
     # xx = np.linspace(xmin, xmax, 1000)
     # ax.plot(xx, xx, 'r-', label='equality')
     # ax.plot(xx, xx+0.18, 'b-', label='y = x + 0.18')
-    ax.plot(xs, ys, 'k-', label=label) #alpha=0.2)
+    ax.plot(xs, ys, 'ko', label=label, alpha=0.4)
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -1313,7 +1313,7 @@ def plot_simple_dumb(xs, ys, label='', save=False,
     
     return
 
-def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
+def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas, textlabels,
                       xlabel=None, ylabel=None, title=None,
                       xmin=None, xmax=None, ymin=None, ymax=None,
                       figsizewidth=9.5, figsizeheight=7, scale='linear', loc=0,
@@ -1330,6 +1330,11 @@ def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas,
                 color=colors[i], label=labels[i], alpha=alphas[i], ms=ms,
                 # mfc='none',
                 mec=colors[i], mew=2)
+    
+    # for xx, yy, labs, alpha in zip(xs[1:], ys[1:], textlabels, alphas[1:]) :
+    #     for xi, yi, lab in zip(xx, yy, labs) :
+    #         ax.text(xi, yi, lab, fontsize=10, ha='center', va='center',
+    #                 alpha=alpha)
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -1488,6 +1493,102 @@ def plot_multi_error(xs, ys, lo, hi, labels, colors, markers, styles, reg,
     
     ax.legend(lines + seclines, labels + seclabels, fontsize=15,
               facecolor='whitesmoke', framealpha=1, loc=loc)
+    
+    plt.tight_layout()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
+    
+    return
+
+def plot_radial_profiles(xs, ys, labels, snr1, snr2,
+                         xlabel=None, ylabel1=None, ylabel2=None,
+                         ylabel3=None, xmin=None, xmax=None, ymin1=None,
+                         ymax1=None, ymin2=None, ymax2=None, ymin3=None,
+                         ymax3=None, figsizewidth=9.5, figsizeheight=9.5,
+                         loc=0, save=False, outfile=None, title=None) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    
+    gs = fig.add_gridspec(3, 1, hspace=0)
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    ax3 = fig.add_subplot(gs[2, 0], sharex=ax1)
+    
+    colors = ['r', 'r', 'b', 'b', 'k', 'k']
+    markers = ['', '', '', '', '', '']
+    styles = ['-', '--', '-', '--', '-', '--']
+    
+    alphas = [0.5, 0.65]*3
+    lws = [1.25, 1.5]*3
+    
+    edges = np.linspace(0, 5, 21)
+    ax1.axvspan(6, 6.25, color='grey', alpha=0.2, lw=0, label=r'$5 \leq {\rm SNR} < 10$')
+    ax1.axvspan(6.25, 6.5, color='grey', alpha=0.4, lw=0, label=r'${\rm SNR} < 5$')
+    for pos in np.where((snr2 < 10) & (snr2 >= 5))[0] :
+        ax1.axvspan(edges[pos], edges[pos+1], color='grey', alpha=0.2, lw=0)
+    for pos in np.where(snr2 < 5)[0] :
+        ax1.axvspan(edges[pos], edges[pos+1], color='grey', alpha=0.4, lw=0)
+    for i in range(2) :
+        ax1.plot(xs[i], ys[i],
+                     marker=markers[i],
+                     linestyle=styles[i], color=colors[i], label=labels[i],
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
+    
+    for pos in np.where((snr2 < 10) & (snr2 >= 5))[0] :
+        ax2.axvspan(edges[pos], edges[pos+1], color='grey', alpha=0.2, lw=0)
+    for pos in np.where(snr2 < 5)[0] :
+        ax2.axvspan(edges[pos], edges[pos+1], color='grey', alpha=0.4, lw=0)
+    for i in range(2, 4) :
+        ax2.plot(xs[i], ys[i],
+                     marker=markers[i],
+                     linestyle=styles[i], color=colors[i], label=labels[i],
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
+    
+    for i in range(4, 6) :
+        ax3.plot(xs[i], ys[i],
+                     marker=markers[i],
+                     linestyle=styles[i], color=colors[i], label=labels[i],
+                     alpha=alphas[i], lw=lws[i])
+                     # ecolor='lightgray', elinewidth=1.5)
+    
+    ax1.tick_params(bottom=False, labelbottom=False)
+    ax2.tick_params(bottom=False, labelbottom=False)
+    
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    ax3.set_yscale('log')
+    
+    ax1.set_title(title, fontsize=10)
+    ax3.set_xlabel(xlabel, fontsize=10)
+    ax1.set_ylabel(ylabel1, fontsize=10)
+    ax2.set_ylabel(ylabel2, fontsize=10)
+    ax3.set_ylabel(ylabel3, fontsize=10)
+    
+    ax2.set_xlim(xmin, xmax)
+    ax1.set_ylim(ymin1, ymax1)
+    ax2.set_ylim(ymin2, ymax2)
+    ax3.set_ylim(ymin3, ymax3)
+    
+    if ax2.get_ylim()[0] < 1e-10 :
+        ax2.set_ylim(1e-10, ymax2)
+    
+    if ax3.get_ylim()[0] < 1e-15 :
+        ax3.set_ylim(1e-15, ymax3)
+    
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    
+    ax1.legend(lines1 + lines2, labels1 + labels2,
+               fontsize=10, facecolor='whitesmoke', framealpha=1, loc=loc)
     
     plt.tight_layout()
     

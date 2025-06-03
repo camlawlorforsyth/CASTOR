@@ -57,6 +57,9 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
     fast_Sigma, fast_Sigma_SFR, fast_Sigma_sSFR = get_fastpp_profiles(
         subID, snap, model_redshift=model_redshift)
     
+    # get the SNR for the profiles from the photometry that was used in FAST++
+    castor_avg_snr, roman_avg_snr = get_snr_profiles(subID, snap)
+    
     # prepare quantities for plotting
     radial_bin_centers = np.linspace(0.125, 4.875, 20) # units of Re
     xs = np.array([radial_bin_centers, radial_bin_centers, radial_bin_centers,
@@ -82,12 +85,9 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
     textwidth = 7.10000594991006
     textheight = 9.095321710253218
     labels = ['TNG', 'BC03+dust+noise+PSF', '', '', '', '']
-    colors = ['r', 'r', 'b', 'b', 'k', 'k']
-    markers = ['', '', '', '', '', '']
-    styles = ['-', '--', '-', '--', '-', '--']
     outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
         snap, subID, str(model_redshift).replace('.', ''))
-    plt.plot_multi_vertical_error(xs, ys, labels, colors, markers, styles, 2,
+    plt.plot_radial_profiles(xs, ys, labels, castor_avg_snr, roman_avg_snr,
         xlabel=r'$R/R_{\rm e}$',
         ylabel1=r'$\Sigma_{*}/{\rm M}_{\odot}~{\rm kpc}^{-2}$',
         ylabel2=r'$\Sigma_{\rm SFR}/{\rm M}_{\odot}~{\rm yr}^{-1}~{\rm kpc}^{-2}$',
@@ -96,7 +96,7 @@ def compare_fits_to_tng(subIDfinal, snap, subID, logM, Re, model_redshift=0.5) :
         ymin2=ymin2, ymax2=ymax2, ymin3=ymin3, ymax3=ymax3,
         title='subID {}, logM={:.3f}, Re={:.3f}'.format(subIDfinal, logM, Re),
         figsizeheight=textheight/1.5, figsizewidth=textwidth,
-        outfile=outfile, save=True)
+        outfile=outfile, save=True, loc=1)
     
     return
 
@@ -120,6 +120,16 @@ def concatenate_all_fits(model_redshift=0.5, save=True) :
         mask[idx] = True
         idx += len(np.where(sample['subIDfinal'] == subIDfinal)[0])
     sample = sample[mask]
+    
+    # from pypdf import PdfWriter
+    # merger = PdfWriter()
+    # for subID, snap in zip(sample['subID'], sample['snapshot']) :
+    #     outfile = 'figures/radial_profiles_GALAXEV/{}_{}_z_{:03}.pdf'.format(
+    #         snap, subID, str(model_redshift).replace('.', ''))
+    #     merger.append(outfile)
+    # merger.write('figures/radial_profiles_GALAXEV/z_{:03}.pdf'.format(
+    #     str(model_redshift).replace('.', '')))
+    # merger.close()
     
     if save : # concatenate the output images by mechanism
         from pypdf import PdfWriter
@@ -178,6 +188,34 @@ def get_fastpp_profiles(subID, snap, model_redshift=0.5, skiprows=18,
         fast_Sigma_SFR = sfr_profile
     
     return fast_Sigma, fast_Sigma_SFR, fast_Sigma_SFR/fast_Sigma
+
+def get_snr_profiles(subID, snap) :
+    
+    # load photometry data input into FAST++
+    data = np.loadtxt('photometry/photometry_2April2025.cat',
+                      dtype=str)[:, :-1] #.astype(float)
+    
+    # define which rows to use, based on the 'id' containing the subID
+    ids = data[:, 0]
+    ids = np.stack(np.char.split(ids, sep='_').ravel())[:, :2].astype(int)
+    use = (ids[:, 0] == snap) & (ids[:, 1] == subID)
+    use[np.where(use)[0][-2:]] = False # account for 1 kpc and integrated bins
+    photometry = data[:, 1:].astype(float)[use]
+    
+    snrs = np.array([photometry[:, 0]/photometry[:, 1],
+                     photometry[:, 2]/photometry[:, 3],
+                     photometry[:, 4]/photometry[:, 5],
+                     photometry[:, 6]/photometry[:, 7],
+                     photometry[:, 8]/photometry[:, 9],
+                     photometry[:, 10]/photometry[:, 11],
+                     photometry[:, 12]/photometry[:, 13],
+                     photometry[:, 14]/photometry[:, 15],
+                     photometry[:, 16]/photometry[:, 17]]).T
+    
+    castor_avg_snr = np.mean(snrs[:, :4], axis=1)
+    roman_avg_snr = np.mean(snrs[:, 4:], axis=1)
+    
+    return castor_avg_snr, roman_avg_snr
 
 def get_tng_profiles(subID, snap, Re=1.0, surfacedensity=True) :
     

@@ -476,3 +476,40 @@ def throughputs_wise() :
                    final, header='WAVELENGTH THROUGHPUT')
     
     return
+
+def save_castor_roman_throughput_plots() :
+    
+    import plotting as plt
+    
+    castor = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g']
+    # roman = ['roman_f062', 'roman_f087', 'roman_f106', 'roman_f129',
+    #          'roman_f146', 'roman_f158', 'roman_f184', 'roman_f213',]
+    roman = ['roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
+    
+    waves = []
+    trans = []
+    for filt in castor :
+        ww, tt = np.loadtxt('passbands/passbands_micron/{}.txt'.format(filt),
+                            unpack=True)
+        waves.append(ww)
+        trans.append(tt)
+    plt.plot_simple_multi(waves, trans, castor,
+        ['hotpink', 'violet', 'darkviolet', 'dodgerblue', 'cyan'],
+        ['']*5, ['-', '--', '-', '--', '-'], [1]*5, [], xlabel=r'Wavelength ($\mu$m)',
+        ylabel='Transmission', xmin=0.1, xmax=0.6, ymin=0, ymax=0.7,
+        save=True, outfile='figures/castor_filters.pdf')
+    
+    waves = []
+    trans = []
+    for filt in roman :
+        ww, tt = np.loadtxt('passbands/passbands_micron/{}.txt'.format(filt),
+                            unpack=True)
+        waves.append(ww)
+        trans.append(tt)
+    plt.plot_simple_multi(waves, trans, roman,
+        ['gold', 'darkorange', 'orangered', 'red'],
+        ['']*4, ['--', '-', '--', '-'], [1]*4, [], xlabel=r'Wavelength ($\mu$m)',
+        ylabel='Transmission', xmin=0.8, xmax=2.1, ymin=0, ymax=0.7,
+        save=True, outfile='figures/roman_filters.pdf')
+    
+    return

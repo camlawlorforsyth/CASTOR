@@ -4,7 +4,6 @@ import numpy as np
 
 from astropy.cosmology import FlatLambdaCDM
 from astropy.io import fits
-from astropy.table import Table
 import astropy.units as u
 import h5py
 from photutils.aperture import CircularAnnulus, CircularAperture
@@ -12,7 +11,6 @@ from photutils.aperture import CircularAnnulus, CircularAperture
 from core import (calculate_distance_to_center, get_rotation_input,
                   load_massive_galaxy_sample)
 from fitting import get_fastpp_profiles, get_tng_profiles
-from fastpy import calzetti2000
 from galaxev import determine_distance_from_SFMS, determine_dust_radial_profile
 import plotting as plt
 
@@ -118,33 +116,182 @@ def compare_fitted_to_simulated_values(model_redshift=0.5) :
     dists = np.array([np.arange(0.125, 5, 0.25)]*len(sample)).flatten()
     mask = (dists <= maxR)
     
-    select = np.isfinite(tng_logM) & np.isfinite(fit_logM) & (dists <= maxR)
-    plt.plot_scatter_dumb(tng_logM[select], fit_logM[select], dists[select], 'logM', 'o',
-        xmin=6, xmax=11, ymin=6, ymax=11,
-        vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG logM',
-        ylabel='FAST++ logM')
+    # select = np.isfinite(tng_logM) & np.isfinite(fit_logM) & (dists <= maxR)
+    # plt.plot_scatter_dumb(tng_logM[select], fit_logM[select], dists[select], 'logM', 'o',
+    #     xmin=6, xmax=11, ymin=6, ymax=11,
+    #     vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG logM',
+    #     ylabel='FAST++ logM')
     
-    tng_SFR[tng_SFR == 0] = 1e-4
-    fit_SFR[fit_SFR < 1e-4] = 1e-4
-    
-    plt.plot_scatter_dumb(np.log10(tng_SFR)[mask], np.log10(fit_SFR)[mask], dists[mask], 'SFR', 'o',
-        xmin=-4, xmax=1, ymin=-4, ymax=1,
-        vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG log(SFR)',
-        ylabel='FAST++ log(SFR)')
+    # tng_SFR[tng_SFR == 0] = 1e-4
+    # fit_SFR[fit_SFR < 1e-4] = 1e-4
+    # plt.plot_scatter_dumb(np.log10(tng_SFR)[mask], np.log10(fit_SFR)[mask], dists[mask], 'SFR', 'o',
+    #     xmin=-4, xmax=1, ymin=-4, ymax=1,
+    #     vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG log(SFR)',
+    #     ylabel='FAST++ log(SFR)')
     
     np.random.seed(0)
     
-    plt.plot_scatter_dumb(np.log10(tng_metal)[mask],
-        np.random.normal(np.log10(fit_metal), 0.03)[mask], dists[mask], r'$Z$', 'o',
-        xmin=-4.1, xmax=0, ymin=-4.1, ymax=0,
-        vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG median log(metallicity)',
-        ylabel='FAST++ log(metallicity)')
+    # plt.plot_scatter_dumb(np.log10(tng_metal)[mask],
+    #     np.random.normal(np.log10(fit_metal), 0.05)[mask], dists[mask], r'$Z$', 'o',
+    #     xmin=-4.15, xmax=-0.85, ymin=-4.15, ymax=-0.85,
+    #     vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG median log(metallicity)',
+    #     ylabel='FAST++ log(metallicity)')
     
-    plt.plot_scatter_dumb(tng_dust[mask], np.random.normal(fit_dust, 0.03)[mask], dists[mask],
-        r'$\langle {\rm A}_{\rm V} \rangle$', 'o',
-        xmin=-0.1, xmax=2.6, ymin=-0.1, ymax=2.6,
-        vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG average dust',
-        ylabel='FAST++ average dust')
+    # plt.plot_scatter_dumb(tng_dust[mask], np.random.normal(fit_dust, 0.03)[mask], dists[mask],
+    #     r'$\langle {\rm A}_{\rm V} \rangle$', 'o',
+    #     xmin=-0.1, xmax=2.6, ymin=-0.1, ymax=2.6,
+    #     vmin=0, vmax=5, cbar_label='R/Re', xlabel='TNG average dust',
+    #     ylabel='FAST++ average dust')
+    
+    # xs = np.log10(fit_metal) - np.log10(tng_metal)
+    # ys = fit_dust - tng_dust
+    # plt.plot_scatter_dumb(xs, ys, np.log10(fit_SFR) - np.log10(tng_SFR), '', 'o',
+    #     xlabel=r'log(metallicity$_{\rm FAST++}$) - log(metallicity$_{\rm TNG}$)',
+    #     ylabel=r'dust$_{\rm FAST++}$ - dust$_{\rm TNG}$',
+    #     cbar_label=r'log(SFR$_{\rm FAST++}$) - log(SFR$_{\rm TNG}$)',
+    #     xmin=-2.3, xmax=1.925, ymin=-0.4, ymax=2.6, vmin=-1, vmax=1)
+    
+    # plt.plot_scatter_dumb(xs, ys, fit_logM - tng_logM, '', 'o',
+    #     xlabel=r'log(metallicity$_{\rm FAST++}$) - log(metallicity$_{\rm TNG}$)',
+    #     ylabel=r'dust$_{\rm FAST++}$ - dust$_{\rm TNG}$',
+    #     cbar_label=r'logM$_{\rm FAST++}$ - logM$_{\rm TNG}$',
+    #     xmin=-2.3, xmax=1.925, ymin=-0.4, ymax=2.6, vmin=-0.8, vmax=0.2)
+    
+    # get the photometry file that was passed into FAST++
+    photometry = np.loadtxt('photometry/photometry_2April2025.cat',
+                            dtype=str)[:, 1:-1].astype(float)
+    mask = np.full(22, True); mask[-2], mask[-1] = False, False
+    photometry = photometry[np.array(list(mask)*len(sample))] # select the correct rows
+    snrs = np.array([photometry[:, 0]/photometry[:, 1],
+                     photometry[:, 2]/photometry[:, 3],
+                     photometry[:, 4]/photometry[:, 5],
+                     photometry[:, 6]/photometry[:, 7],
+                     photometry[:, 8]/photometry[:, 9],
+                     photometry[:, 10]/photometry[:, 11],
+                     photometry[:, 12]/photometry[:, 13],
+                     photometry[:, 14]/photometry[:, 15],
+                     photometry[:, 16]/photometry[:, 17]]).T
+    
+    castor_avg_snr = np.log10(np.mean(snrs[:, :4], axis=1))
+    roman_avg_snr = np.log10(np.mean(snrs[:, 4:], axis=1))
+    # castor_avg_snr[~np.isfinite(castor_avg_snr)] = -1
+    # roman_avg_snr[~np.isfinite(roman_avg_snr)] = -1
+    
+    # plt.plot_scatter_dumb(xs, ys, castor_avg_snr, '', 'o',
+    #     xlabel=r'log(metallicity$_{\rm FAST++}$) - log(metallicity$_{\rm TNG}$)',
+    #     ylabel=r'dust$_{\rm FAST++}$ - dust$_{\rm TNG}$',
+    #     cbar_label=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     xmin=-2.3, xmax=1.925, ymin=-0.4, ymax=2.6, vmin=-1, vmax=2.5)
+    
+    # plt.plot_scatter_dumb(xs, ys, roman_avg_snr, '', 'o',
+    #     xlabel=r'log(metallicity$_{\rm FAST++}$) - log(metallicity$_{\rm TNG}$)',
+    #     ylabel=r'dust$_{\rm FAST++}$ - dust$_{\rm TNG}$',
+    #     cbar_label=r'Roman log($\langle$SNR$\rangle$)',
+    #     xmin=-2.3, xmax=1.925, ymin=-0.4, ymax=2.6, vmin=-1, vmax=2.5)
+    
+    # plt.plot_scatter_dumb(np.random.normal(dists, 0.03), castor_avg_snr,
+    #     np.log10(fit_SFR) - np.log10(tng_SFR), '', 'o',
+    #     xlabel='R/Re', ylabel=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'log(SFR$_{\rm FAST++}$) - log(SFR$_{\rm TNG}$)',
+    #     ymin=-1.1, vmin=-1, vmax=1)
+    
+    # plt.plot_scatter_dumb(np.random.normal(dists, 0.03), roman_avg_snr,
+    #     fit_logM - tng_logM, '', 'o',
+    #     xlabel='R/Re', ylabel=r'Roman log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'logM$_{\rm FAST++}$ - logM$_{\rm TNG}$',
+    #     ymin=-1.1, vmin=-0.8, vmax=0.2)
+    
+    # plt.histogram(castor_avg_snr, r'CASTOR log($\langle$SNR$\rangle$)', bins=65)
+    # plt.histogram(roman_avg_snr, r'Roman log($\langle$SNR$\rangle$)', bins=65)
+    
+    # plt.plot_scatter_dumb(tng_logM, castor_avg_snr,
+    #     np.log10(fit_SFR) - np.log10(tng_SFR), '', 'o',
+    #     xlabel='TNG logM (per annulus)',
+    #     ylabel=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'log(SFR$_{\rm FAST++}$) - log(SFR$_{\rm TNG}$)',
+    #     xmin=7, xmax=11, ymin=-1.1, vmin=-1, vmax=1)
+    
+    masses = np.full(4240, -1.0)
+    for i, mass in enumerate(sample['logM'].data) :
+        masses[i*20:i*20+20] = mass # integrated mass
+    
+    # plt.plot_scatter_dumb(np.random.normal(masses, 0.03), castor_avg_snr,
+    #     np.log10(fit_SFR) - np.log10(tng_SFR), '', 'o',
+    #     xlabel='TNG logM (integrated)',
+    #     ylabel=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'log(SFR$_{\rm FAST++}$) - log(SFR$_{\rm TNG}$)',
+    #     xmin=9.4, xmax=11.3, ymin=-1.1, vmin=-1, vmax=1)
+    
+    # plt.plot_scatter_dumb(tng_logM, roman_avg_snr,
+    #     fit_logM - tng_logM, '', 'o',
+    #     xlabel='TNG logM (per annulus)',
+    #     ylabel=r'Roman log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'logM$_{\rm FAST++}$ - logM$_{\rm TNG}$',
+    #     xmin=7, xmax=11, ymin=-1.1, vmin=-0.8, vmax=0.2)
+    
+    # plt.plot_scatter_dumb(np.random.normal(masses, 0.03), roman_avg_snr,
+    #     fit_logM - tng_logM, '', 'o',
+    #     xlabel='TNG logM (integrated)',
+    #     ylabel=r'Roman log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'logM$_{\rm FAST++}$ - logM$_{\rm TNG}$',
+    #     xmin=9.4, xmax=11.3, ymin=-1.1, vmin=-0.8, vmax=0.2)
+    
+    Res = np.full(4240, -1.0)
+    for i, Re in enumerate(sample['Re'].data) :
+        Res[i*20:i*20+20] = Re
+    
+    # plt.plot_scatter_dumb(np.log10(np.random.normal(Res, 0.03)), castor_avg_snr,
+    #     np.log10(fit_SFR) - np.log10(tng_SFR), '', 'o',
+    #     xlabel='TNG log(Re/kpc)',
+    #     ylabel=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'log(SFR$_{\rm FAST++}$) - log(SFR$_{\rm TNG}$)',
+    #     xmin=-0.4, xmax=0.9, ymin=-1.1, vmin=-1, vmax=1)
+    
+    # plt.plot_scatter_dumb(np.log10(np.random.normal(Res, 0.03)), roman_avg_snr,
+    #     fit_logM - tng_logM, '', 'o',
+    #     xlabel='TNG log(Re/kpc)',
+    #     ylabel=r'Roman log($\langle$SNR$\rangle$)',
+    #     cbar_label=r'logM$_{\rm FAST++}$ - logM$_{\rm TNG}$',
+    #     xmin=-0.4, xmax=0.9, ymin=-1.1, vmin=-0.8, vmax=0.2)
+    
+    randomized_masses = np.random.normal(masses, 0.03)
+    randomized_sizes = np.log10(np.random.normal(Res, 0.03))
+    # plt.plot_scatter_dumb(randomized_masses, randomized_sizes, castor_avg_snr,
+    #     '', 'o', xlabel='TNG logM (integrated)', ylabel='TNG log(Re/kpc)',
+    #     cbar_label=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     xmin=9.4, xmax=11.3, ymin=-0.4, ymax=0.9, vmin=-1, vmax=2.5)
+    # plt.plot_scatter_dumb(randomized_masses, randomized_sizes, roman_avg_snr,
+    #     '', 'o', xlabel='TNG logM (integrated)', ylabel='TNG log(Re/kpc)',
+    #     cbar_label=r'Roman log($\langle$SNR$\rangle$)',
+    #     xmin=9.4, xmax=11.3, ymin=-0.4, ymax=0.9, vmin=-1, vmax=2.5)
+    
+    # mass_surface_density = np.log10(masses/(np.pi*Res*Res))
+    # plt.plot_scatter_dumb(np.random.normal(masses, 0.03)[castor_avg_snr >= 1],
+    #     np.random.normal(mass_surface_density, 0.03)[castor_avg_snr >= 1],
+    #     castor_avg_snr[castor_avg_snr >= 1], '', 'o',
+    #     xlabel='TNG logM (integrated)',
+    #     ylabel=r'$\Sigma_{*}/{\rm M}_{\odot}~{\rm kpc}^{-2}$',
+    #     cbar_label=r'CASTOR log($\langle$SNR$\rangle$)',
+    #     xmin=9.4, xmax=11.3, ymin=-1.25, ymax=1.25, vmin=-1, vmax=2.5)
+    
+    # plt.plot_scatter_dumb(np.random.normal(masses, 0.03)[roman_avg_snr >= 1],
+    #     np.random.normal(mass_surface_density, 0.03)[roman_avg_snr >= 1],
+    #     roman_avg_snr[roman_avg_snr >= 1], '', 'o',
+    #     xlabel='TNG logM (integrated)',
+    #     ylabel=r'$\Sigma_{*}/{\rm M}_{\odot}~{\rm kpc}^{-2}$',
+    #     cbar_label=r'Roman log($\langle$SNR$\rangle$)',
+    #     xmin=9.4, xmax=11.3, ymin=-1.25, ymax=1.25, vmin=-1, vmax=2.5)
+    
+    mask = (sample['mechanism'].data == 1)
+    
+    # castor_check = (castor_avg_snr.reshape(212, 20) >= 0.6989700043360189)
+    roman_check = (roman_avg_snr.reshape(212, 20) >= 1)
+    # [print(val.astype(int)) for val in roman_check]
+    
+    # print(np.sum(np.all(roman_check[mask][:, :12], axis=1))) # out to 3 Re
+    
+    # plt.plot_scatter_dumb(roman_avg_snr, castor_avg_snr, 'k', '', '.',
+    #     xmin=-1, xmax=3, ymin=-1, ymax=3)
     
     return
 
@@ -230,7 +377,7 @@ def compute_all_metallicities() :
     sample = sample[mask]
     
     # create an output file to store the metallicity profiles
-    outfile = 'tools/TNG_massive_metallicity_datacube.hdf5'
+    outfile = 'tools/TNG_massive_metallicity-weighted_datacube.hdf5'
     if not exists(outfile) :
         with h5py.File(outfile, 'w') as hf :
             hf.create_dataset('metallicity_16', data=np.zeros((1666, 100, 20)))
@@ -315,7 +462,7 @@ def compute_dust_profile(snap, subID, logM, logSFR, Re, model_redshift=0.5,
 def compute_metallicity_profile(snap, subID, Re, center) :
     
     # get the stellar particle positions and metallicties
-    _, _, _, _, _, _, star_coords, star_metals = get_rotation_input(snap, subID)
+    _, _, _, _, _, masses, star_coords, star_metals = get_rotation_input(snap, subID)
     
     # get the 2D projected distances to each stellar particle
     rs = np.sqrt(np.square(star_coords[:, 0] - center[0]) +
@@ -335,7 +482,8 @@ def compute_metallicity_profile(snap, subID, Re, center) :
             mask = (rs > lo) & (rs <= hi)
         
         if np.sum(mask) > 0 :
-            los[i], mes[i], his[i] = np.percentile(star_metals[mask], [16, 50, 84])
+            los[i], mes[i], his[i] = np.percentile(star_metals[mask], [16, 50, 84],
+                weights=masses[mask], method='inverted_cdf')
         else :
             los[i], mes[i], his[i] = np.nan, np.nan, np.nan
     
@@ -370,9 +518,11 @@ def get_dust_profile(loc, snap, model_redshift=0.5) :
 def get_metallicity_profile(loc, snap) :
     
     # get the raw metallicity profiles from TNG
-    with h5py.File('tools/TNG_massive_metallicity_datacube.hdf5', 'r') as hf :
+    with h5py.File('tools/TNG_massive_metallicity-weighted_datacube.hdf5', 'r') as hf :
         metallicity_16 = hf['metallicity_16'][loc, snap]
         metallicity_50 = hf['metallicity_50'][loc, snap]
         metallicity_84 = hf['metallicity_84'][loc, snap]
     
     return metallicity_16, metallicity_50, metallicity_84
+
+compare_fitted_to_simulated_values()

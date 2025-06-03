@@ -2,6 +2,7 @@
 import os
 import numpy as np
 
+from astropy.convolution import convolve
 from astropy.cosmology import FlatLambdaCDM
 from astropy.io import fits
 from astropy.table import Table, vstack
@@ -38,11 +39,98 @@ def determine_all_photometry(model_redshift=0.5) :
         outfile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
             str(model_redshift).replace('.', ''))
         if not os.path.exists(outfile) :
-            determine_photometry_circular_annuli(snap, subID, Re,
+            determine_photometry_pixelbypixel(snap, subID, Re,
                 model_redshift=model_redshift)
         print('snap {} subID {} done'.format(snap, subID))
     
     return
+
+def determine_photometry_pixelbypixel(snap, subID, Re, model_redshift=0.5,
+                                      fov=10, save=True) :
+    
+    # open the input image
+    infile = 'cutouts/{}_{}_z_{:03}.fits'.format(snap, subID,
+        str(model_redshift).replace('.', ''))
+    with fits.open(infile) as hdu :
+        hdr = hdu[0].header
+        images = hdu[0].data*u.Jy # Jy [per pixel]
+    assert hdr['REDSHIFT'] == model_redshift
+    
+    # get the filters
+    filters = [hdr['FILTER{}'.format(i)] for i in range(len(hdr['FILTER*']))]
+    
+    # add the photometry for every pixel and every filter into a table
+    photometry = Table()
+    for i, filt in enumerate(filters) :
+        # open the science images and the corresponding noise images and add
+        # the pixel values into the photometry table
+        photometry[filt + '_flux'] = images[2*i].flatten() # science
+        photometry[filt + '_err'] = images[2*i + 1].flatten() # noise
+    
+    # make unique IDs for each annulus
+    pixel = ['{}_{}_pix_{}'.format(snap, subID, i) for i in np.arange(len(photometry))]
+    
+    # add the IDs to the photometric table, at the beginning of the table
+    photometry.add_column(pixel, name='id', index=0)
+    
+    # add the redshift into the table
+    photometry['z_spec'] = np.full_like(pixel, model_redshift)
+    
+    # mask the photometry table to pixels that have an average Roman SNR >= 10
+    mask = (determine_roman_snr_map(images) >= 10).flatten()
+    photometry = photometry[mask]
+    
+    if save :
+        os.makedirs('photometry/', exist_ok=True) # ensure the output directory
+            # for the photometric tables is available
+        
+        outfile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
+            str(model_redshift).replace('.', ''))
+        photometry.write(outfile)
+    
+    return
+
+def determine_castor_snr_map(image, targetSNR=10) :
+    
+    # average the SNR maps, given the stochasticity that will appear in the
+    # low SNR regions
+    snr_avg = np.array([image[0]/image[1], image[2]/image[3], image[4]/image[5],
+                        image[6]/image[7], image[8]/image[9]]).mean(axis=0)
+    
+    # set negative pixels to zero for simplicity
+    snr_avg[snr_avg < 0] = 0.0
+    
+    # convolve the average SNR maps with an averaging kernel to further
+    # remove low SNR stochasticity
+    snr_conv = convolve(snr_avg, np.full((3, 3), 1/9))
+    
+    # create a final SNR map, where high SNR pixels are kept intact, and
+    # low SNR pixels are replaced with their convolved counterparts
+    snr_best = snr_avg.copy()
+    snr_best[snr_avg < targetSNR] = snr_conv[snr_avg < targetSNR]
+    
+    return snr_best
+
+def determine_roman_snr_map(image, targetSNR=10) : 
+    
+    # average the SNR maps, given the stochasticity that will appear in the
+    # low SNR regions
+    snr_avg = np.array([image[10]/image[11], image[12]/image[13],
+                        image[14]/image[15], image[16]/image[17]]).mean(axis=0)
+    
+    # set negative pixels to zero for simplicity
+    snr_avg[snr_avg < 0] = 0.0
+    
+    # convolve the average SNR maps with an averaging kernel to further
+    # remove low SNR stochasticity
+    snr_conv = convolve(snr_avg, np.full((3, 3), 1/9))
+    
+    # create a final SNR map, where high SNR pixels are kept intact, and
+    # low SNR pixels are replaced with their convolved counterparts
+    snr_best = snr_avg.copy()
+    snr_best[snr_avg < targetSNR] = snr_conv[snr_avg < targetSNR]
+    
+    return snr_best
 
 def determine_photometry_circular_annuli(snap, subID, Re, model_redshift=0.5,
                                          fov=10, save=True) :
@@ -241,7 +329,7 @@ def join_all_photometry(model_redshift=0.5, save=True) :
     # final = final[ids == 'int']
     
     if save :
-        outfile = 'photometry/photometry_2April2025.cat'
+        outfile = 'photometry/photometry_2June2025.cat'
         if not os.path.exists(outfile) :
             final.write(outfile, format='ascii.commented_header')
     
