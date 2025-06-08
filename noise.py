@@ -317,8 +317,8 @@ def determine_noise_components() :
     roman_filts = [key for key in dictionary.keys() if 'roman' in key]
     roman_scales = 0.11*np.ones(8)*u.arcsec/u.pix
     roman_bkg = background_roman()*u.mag/np.square(u.arcsec)
-    roman_dark = 0.005*np.ones(8)*u.electron/u.s/u.pix
-    roman_read = 15.5*np.ones(8)*u.electron/u.pix
+    roman_dark = 0.018*np.ones(8)*u.electron/u.s/u.pix
+    roman_read = 13.81*np.ones(8)*u.electron/u.pix
     roman_scalings = np.square(roman_scales)/np.square(0.05*u.arcsec/u.pix)
     roman_dark = roman_dark/roman_scalings
     roman_read = roman_read/roman_scalings
