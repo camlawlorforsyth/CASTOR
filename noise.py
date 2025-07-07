@@ -260,9 +260,8 @@ def determine_noise_components() :
     castor_filts = [key for key in dictionary.keys() if 'castor' in key]
     castor_scales = 0.1*np.ones(5)*u.arcsec/u.pix
     castor_bkg = background_castor()*u.mag/np.square(u.arcsec)
-    castor_dark = np.array([0.00042, 0.00042, 0.00042, 0.00042,
-                            0.002])*u.electron/u.s/u.pix
-    castor_read = np.array([3.15, 3.15, 3.15, 3.15, 4.45])*u.electron/u.pix
+    castor_dark = np.array([0.0001, 0.0001, 0.0001, 0.0001, 0.001])*u.electron/u.s/u.pix
+    castor_read = np.array([3.0, 3.0, 3.0, 3.0, 3.0])*u.electron/u.pix
     castor_scalings = np.square(castor_scales)/np.square(0.05*u.arcsec/u.pix)
     castor_dark = castor_dark/castor_scalings
     castor_read = castor_read/castor_scalings

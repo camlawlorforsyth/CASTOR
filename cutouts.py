@@ -58,13 +58,14 @@ def create_mock_observations(snap, subID, model_redshift=0.5, psf=0.15*u.arcsec,
     dictionary = get_noise()
     
     # define the telescope diameters and collecting areas for CASTOR and Roman
-    diameters = np.array([100, 100, 100, 100, 100, 236, 236, 236, 236])*u.cm
+    diameters = np.array([100, 100, 100, 100, 100,
+                          236, 236, 236, 236, 236, 236, 236])*u.cm
     areas = np.pi*np.square(diameters/2)
     
     # define the exposure durations for the CASTOR ultradeep survey and the
     # Roman HLWAS
     exposures =  np.array([180000, 180000, 180000, 180000, 360000,
-                           146, 146, 146, 146])*u.s
+                           4425, 13917, 13917, 13917, 4425, 4425, 4425])*u.s
     
     '''
     # telescope diameters from
@@ -158,10 +159,16 @@ def create_mock_observations(snap, subID, model_redshift=0.5, psf=0.15*u.arcsec,
     # get the dark current electrons per pixel over the entire exposure
     detector_electrons = Bdet*exposures
     
+    '''
     # get the number of reads, limiting a given exposure to 1000 s, as longer
     # exposures than 1000 s will be dominated by cosmic rays
-    single_exposure = 1000*u.s
-    Nreads = np.ceil(exposures/single_exposure)
+    Nreads = np.ceil(exposures/(1000*u.s))
+    '''
+    # CASTOR: Wide survey is completed in 4 x 250 s exposures, and assume 1000 s
+    # exposures for the remainder of the Ultradeep survey
+    # Roman: use survey strategy from ROTAC Report (page 32):
+    # https://roman.gsfc.nasa.gov/science/ccs/ROTAC-Report-20250424-v3.pdf
+    Nreads = np.array([183, 183, 183, 183, 366, 15, 51, 51, 51, 15, 15, 15]).astype(float)
     
     # get the read noise electrons per pixel
     read_electrons = read_noises*u.pix
@@ -182,9 +189,9 @@ def create_mock_observations(snap, subID, model_redshift=0.5, psf=0.15*u.arcsec,
     sigma_pix = sigma/plate_scale # pixels
     
     output = np.zeros((2*data.shape[0], data.shape[1], data.shape[2]))
-    for i, (filt, frame, pivot, width, throughput, exposure, area, level, Nread,
-        RR, photfnu) in enumerate(zip(filters, data, pivots, widths, throughputs,
-        exposures, areas, nonsource_level, Nreads, read_electrons, photfnus)) :
+    for i, (filt, frame, pivot, exposure, area, level, Nread, RR, photfnu) in enumerate(
+        zip(filters, data, pivots, exposures, areas, nonsource_level, Nreads,
+            read_electrons, photfnus)) :
         
         # the noiseless synthetic GALAXEV images are already in convenient units
         # frame = frame.to(u.Jy) # Jy [per pixel]
@@ -241,13 +248,13 @@ def create_mock_observations(snap, subID, model_redshift=0.5, psf=0.15*u.arcsec,
         
         # add entries for the exposure durations, areas, and photfnu factors
         for i, exposure in enumerate(exposures) :
-            hdr['EXPTIME{}'.format(i)] = (exposure.value,
+            hdr['EXPTME{}'.format(i)] = (exposure.value,
                 'exposure duration (seconds)--calculated')
         for i, area in enumerate(areas) :
             hdr['AREA{}'.format(i)] = (area.value,
                 'detector area (cm2)--calculated')
         for i, photfnu in enumerate(photfnus) :
-            hdr['PHOTFNU{}'.format(i)] = (photfnu.value,
+            hdr['PHTFNU{}'.format(i)] = (photfnu.value,
                 'inverse sensitivity, Jy*sec*cm2/electron')
         
         hdulist = fits.HDUList([fits.PrimaryHDU(data=output, header=hdr)])

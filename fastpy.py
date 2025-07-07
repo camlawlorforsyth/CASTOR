@@ -131,15 +131,15 @@ def dtt_from_fit(ts, ltau, lage, rr, norm=1.0) :
     # https://gitlab.lam.fr/cigale/cigale/-/blob/master/pcigale/sed_modules/sfhdelayedbq.py#L77-L83
     
     # get tau and lage into Myr, and convert lage into regular time (ie. BB
-    tau = np.power(10, ltau)/1e6 # Myr                               at t = 0)
-    t0 = np.max(ts) - np.power(10, lage)/1e6 # Myr
+    tau = np.power(10., ltau)/1e6 # Myr                               at t = 0)
+    t0 = np.max(ts) - np.power(10., lage)/1e6 # Myr
     
     # create the SFH, given that the SFH before t0 must be zero
     sfh = (ts - t0)*np.exp(-(ts - t0)/tau)
     sfh[ts < t0] = 0
     
     # apply the truncation for the last 100 Myr
-    sfh[ts >= np.max(ts) - 100] = np.power(10, rr)*sfh[ts >= np.max(ts) - 100]
+    sfh[ts >= np.max(ts) - 100] = np.power(10., rr)*sfh[ts >= np.max(ts) - 100]
     
     # normalize the SFH if requested
     if norm != 1 :
@@ -176,7 +176,8 @@ def get_bc03_library(metal) :
     # initial mass function with given metallicity
     
     metal = str(metal)[2:] # convert to string, remove leading zero and decimal
-    table = Table.read('tools/bc03_lr_ch_z{}.ised_ASCII.fits'.format(metal))[0]
+    table = Table.read('tools/from_fastpp_bc03_2016update/' +
+                       'bc03_lr_ch_z{}.ised_ASCII.fits'.format(metal))[0]
     
     ages = table['AGE']/1e6 # (221), [Myr]
     masses = table['MASS']  # (221), [Msol]
@@ -189,7 +190,8 @@ def get_bc03_waves(metal) :
     # initial mass function with given metallicity
     
     metal = str(metal)[2:] # convert to string, remove leading zero and decimal
-    table = Table.read('tools/bc03_lr_ch_z{}.ised_ASCII.fits'.format(metal))[0]
+    table = Table.read('tools/from_fastpp_bc03_2016update/' +
+                       'bc03_lr_ch_z{}.ised_ASCII.fits'.format(metal))[0]
     
     waves = table['LAMBDA'] # (1221), [Angstrom]
     
@@ -435,8 +437,9 @@ def resave_bc03_libraries_in_fastpp_format() :
     for i, metallicity in enumerate(metallicities) :
         t = Table([[stellar_ages], [masses[i]], [wavelengths], [datacube[i]]],
                   names=('AGE', 'MASS', 'LAMBDA', 'SED'))
-        t.write('bc03_lr_ch_z{}.ised_ASCII.fits'.format(
-            str(metallicity).split('.')[1]))
+        t.write('tools/from_fastpp_bc03_2016update/' +
+                'bc03_lr_ch_z{}.ised_ASCII.fits'.format(
+                str(metallicity).split('.')[1]))
     
     return
 

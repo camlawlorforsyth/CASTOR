@@ -288,7 +288,4 @@ def save_massive_galaxy_sample() :
     return
 
 def load_massive_galaxy_sample() :
-    
-    infile = 'tools/TNG_massive_sample.fits'
-    
-    return Table.read(infile)
+    return Table.read('tools/TNG_massive_sample.fits')

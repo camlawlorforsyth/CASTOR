@@ -39,7 +39,9 @@ def determine_all_photometry(model_redshift=0.5) :
         outfile = 'photometry/{}_{}_z_{:03}.fits'.format(snap, subID,
             str(model_redshift).replace('.', ''))
         if not os.path.exists(outfile) :
-            determine_photometry_pixelbypixel(snap, subID, Re,
+            # determine_photometry_pixelbypixel(snap, subID, Re,
+            #     model_redshift=model_redshift)
+            determine_photometry_circular_annuli(snap, subID, Re,
                 model_redshift=model_redshift)
         print('snap {} subID {} done'.format(snap, subID))
     
@@ -250,23 +252,23 @@ def join_all_photometry(model_redshift=0.5, save=True) :
     translate = {'castor_uv':'F314', 'castor_uvL':'F315', 'castor_uS':'F316',
                  'castor_u':'F317', 'castor_g':'F318',
                  
-                 'euclid_ie':'F319', 'euclid_ye':'F320', 'euclid_je':'F321',
-                 'euclid_he':'F322',
+                 # 'euclid_ie':'F319', 'euclid_ye':'F320', 'euclid_je':'F321',
+                 # 'euclid_he':'F322',
                  
-                 'hst_f218w':'F323', 'hst_f225w':'F324', 'hst_f275w':'F325', 
-                 'hst_f336w':'F326', 'hst_f390w':'F327', 'hst_f438w':'F328',
-                 'hst_f435w':'F329', 'hst_f475w':'F330', 'hst_f555w':'F331',
-                 'hst_f606w':'F332', 'hst_f625w':'F333', 'hst_f775w':'F334',
-                 'hst_f814w':'F335', 'hst_f850lp':'F336', 'hst_f105w':'F337',
-                 'hst_f110w':'F338', 'hst_f125w':'F339', 'hst_f140w':'F340',
-                 'hst_f160w':'F341',
+                 # 'hst_f218w':'F323', 'hst_f225w':'F324', 'hst_f275w':'F325', 
+                 # 'hst_f336w':'F326', 'hst_f390w':'F327', 'hst_f438w':'F328',
+                 # 'hst_f435w':'F329', 'hst_f475w':'F330', 'hst_f555w':'F331',
+                 # 'hst_f606w':'F332', 'hst_f625w':'F333', 'hst_f775w':'F334',
+                 # 'hst_f814w':'F335', 'hst_f850lp':'F336', 'hst_f105w':'F337',
+                 # 'hst_f110w':'F338', 'hst_f125w':'F339', 'hst_f140w':'F340',
+                 # 'hst_f160w':'F341',
                  
-                 'jwst_f070w':'F342', 'jwst_f090w':'F343', 'jwst_f115w':'F344',
-                 'jwst_f150w':'F345', 'jwst_f200w':'F346', 'jwst_f277w':'F347',
-                 'jwst_f356w':'F348', 'jwst_f410m':'F349', 'jwst_f444w':'F350',
-                 'jwst_f560w':'F351', 'jwst_f770w':'F352', 'jwst_f1000w':'F353',
-                 'jwst_f1130w':'F354', 'jwst_f1280w':'F355', 'jwst_f1500w':'F356',
-                 'jwst_f1800w':'F357', 'jwst_f2100w':'F358', 'jwst_f2550w':'F359',
+                 # 'jwst_f070w':'F342', 'jwst_f090w':'F343', 'jwst_f115w':'F344',
+                 # 'jwst_f150w':'F345', 'jwst_f200w':'F346', 'jwst_f277w':'F347',
+                 # 'jwst_f356w':'F348', 'jwst_f410m':'F349', 'jwst_f444w':'F350',
+                 # 'jwst_f560w':'F351', 'jwst_f770w':'F352', 'jwst_f1000w':'F353',
+                 # 'jwst_f1130w':'F354', 'jwst_f1280w':'F355', 'jwst_f1500w':'F356',
+                 # 'jwst_f1800w':'F357', 'jwst_f2100w':'F358', 'jwst_f2550w':'F359',
                  
                  'roman_f062':'F360', 'roman_f087':'F361', 'roman_f106':'F362',
                  'roman_f129':'F363', 'roman_f146':'F364', 'roman_f158':'F365',
@@ -291,9 +293,10 @@ def join_all_photometry(model_redshift=0.5, save=True) :
         idx += len(np.where(sample['subIDfinal'] == subIDfinal)[0])
     sample = sample[mask]
     
-    # define the filters that we want to create images for
+    # define the filters that we want to calculate the photometry for
     filters = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g',
-               'roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
+               'roman_f087', 'roman_f106', 'roman_f129', 'roman_f158',
+               'roman_f184', 'roman_f213', 'roman_f146']
     
     # determine the names that will be used in the final photometric table
     names = ['id']
@@ -329,7 +332,11 @@ def join_all_photometry(model_redshift=0.5, save=True) :
     # final = final[ids == 'int']
     
     if save :
-        outfile = 'photometry/photometry_2June2025.cat'
+        from datetime import date
+        today = date.today()
+        outfile = 'photometry/photometry_{}{}{}_{:03}.cat'.format(
+            today.day, today.strftime('%B'), today.year,
+            str(model_redshift).replace('.', ''))
         if not os.path.exists(outfile) :
             final.write(outfile, format='ascii.commented_header')
     

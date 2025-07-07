@@ -36,6 +36,9 @@ def create_all_idealized_images(model_redshift=0.5, fov=10) :
         idx += len(np.where(sample['subIDfinal'] == subIDfinal)[0])
     sample = sample[mask]
     
+    # from astropy.table import Table
+    # sample = Table.read('potential_SF_mosaic_galaxies.fits')
+    
     # process every galaxy/snapshot pair
     for subID, snap, logM, SFR, Re, center, redshift in zip(sample['subID'],
         sample['snapshot'], sample['logM'], sample['SFR'], sample['Re'],
@@ -66,7 +69,6 @@ def create_idealized_image(snap, subID, logM, SFR, Re, center, sim_redshift,
         snap, subID)
     with h5py.File(infile, 'r') as hf :
         star_coords = hf['PartType4/Coordinates'][:]
-        # stellarHsml = hf['PartType4/StellarHsml'][:] # [ckpc/h]
         Mstar = hf['PartType4/GFM_InitialMass'][:]*1e10/cosmo.h # solMass
         Zstar = hf['PartType4/GFM_Metallicity'][:]
         
@@ -82,7 +84,6 @@ def create_idealized_image(snap, subID, logM, SFR, Re, center, sim_redshift,
     # limit star particles to those that have positive formation times
     mask = (formation_scalefactors > 0)
     star_coords = star_coords[mask]
-    # stellarHsml = stellarHsml[mask]
     Mstar = Mstar[mask]
     Zstar = Zstar[mask]
     formation_times = formation_times[mask]
@@ -92,13 +93,11 @@ def create_idealized_image(snap, subID, logM, SFR, Re, center, sim_redshift,
     
     # normalize by Re
     dx, dy = dx/Re, dy/Re
-    # hsml = stellarHsml/Re
     
     # ignore out-of-range particles
     locs_withinrange = (np.abs(dx) <= 5) | (np.abs(dy) <= 5)
     dx = dx[locs_withinrange]
     dy = dy[locs_withinrange]
-    # hsml = hsml[locs_withinrange]
     
     # define 2D bins (in units of Re)
     edges = np.linspace(-5, 5, nPix + 1) # Re
@@ -112,7 +111,8 @@ def create_idealized_image(snap, subID, logM, SFR, Re, center, sim_redshift,
     
     # define the filters that we want to create images for
     filters = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g',
-               'roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
+               'roman_f087', 'roman_f106', 'roman_f129', 'roman_f158',
+               'roman_f184', 'roman_f213', 'roman_f146']
     num_filters = len(filters)
     
     # populate some attributes of the fits datacube
@@ -265,7 +265,8 @@ def determine_magnitudes(model_redshift=0.5) :
     
     # define the filters that we're interested in creating mock observations for
     filters = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g',
-               'roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
+               'roman_f087', 'roman_f106', 'roman_f129', 'roman_f158',
+               'roman_f184', 'roman_f213', 'roman_f146']
     
     # iterate over the filters
     for filt in filters :

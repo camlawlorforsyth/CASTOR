@@ -8,21 +8,21 @@ def calculate_pivots_and_fwhm() :
     
     filters = ['castor_uv',    'castor_uvL',   'castor_uS',    'castor_u',
                'castor_g',
-               'euclid_ie',    'euclid_ye',    'euclid_je',    'euclid_he',
+               # 'euclid_ie',    'euclid_ye',    'euclid_je',    'euclid_he',
                # 'galex_fuv',    'galex_nuv',
                # 'herschel_70',  'herschel_100', 'herschel_160',
                # 'herschel_250', 'herschel_350', 'herschel_500',
-               'hst_f218w',    'hst_f225w',    'hst_f275w',    'hst_f336w',
-               'hst_f390w',    'hst_f438w',    'hst_f435w',    'hst_f475w',
-               'hst_f555w',    'hst_f606w',    'hst_f625w',    'hst_f775w',
-               'hst_f814w',    'hst_f850lp',   'hst_f105w',    'hst_f110w',
-               'hst_f125w',    'hst_f140w',    'hst_f160w',
+               # 'hst_f218w',    'hst_f225w',    'hst_f275w',    'hst_f336w',
+               # 'hst_f390w',    'hst_f438w',    'hst_f435w',    'hst_f475w',
+               # 'hst_f555w',    'hst_f606w',    'hst_f625w',    'hst_f775w',
+               # 'hst_f814w',    'hst_f850lp',   'hst_f105w',    'hst_f110w',
+               # 'hst_f125w',    'hst_f140w',    'hst_f160w',
                # 'johnson_v',    'johnson_v025', 'johnson_v050',
-               'jwst_f070w',   'jwst_f090w',   'jwst_f115w',   'jwst_f150w',
-               'jwst_f200w',   'jwst_f277w',   'jwst_f356w',   'jwst_f410m',
-               'jwst_f444w',   'jwst_f560w',   'jwst_f770w',   'jwst_f1000w',
-               'jwst_f1130w',  'jwst_f1280w',  'jwst_f1500w',  'jwst_f1800w',
-               'jwst_f2100w',  'jwst_f2550w',
+               # 'jwst_f070w',   'jwst_f090w',   'jwst_f115w',   'jwst_f150w',
+               # 'jwst_f200w',   'jwst_f277w',   'jwst_f356w',   'jwst_f410m',
+               # 'jwst_f444w',   'jwst_f560w',   'jwst_f770w',   'jwst_f1000w',
+               # 'jwst_f1130w',  'jwst_f1280w',  'jwst_f1500w',  'jwst_f1800w',
+               # 'jwst_f2100w',  'jwst_f2550w',
                'roman_f062',   'roman_f087',   'roman_f106',   'roman_f129',
                'roman_f146',   'roman_f158',   'roman_f184',   'roman_f213',
                # 'spitzer_ch1',  'spitzer_ch2',  'spitzer_ch3',  'spitzer_ch4',
@@ -290,10 +290,10 @@ def throughputs_hst() :
     
     # get the throughputs for the ACS WFC filters
     from stsynphot.config import conf
-    conf.rootdir = 'D:/Documents/GitHub/CASTOR/noise/trds'
+    conf.rootdir = 'D:/Documents/GitHub/CASTOR/passbands/trds'
     
     from synphot.config import conf as syn_conf
-    syn_conf.vega_file = 'D:/Documents/GitHub/CASTOR/noise/trds/calspec/alpha_lyr_stis_011.fits'
+    syn_conf.vega_file = 'D:/Documents/GitHub/CASTOR/passbands/trds/calspec/alpha_lyr_stis_011.fits'
     
     from stsynphot.spectrum import band
     
@@ -367,7 +367,7 @@ def throughputs_jwst() :
     # https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-instrumentation/nircam-filters
     
     inDir = ('passbands/passbands_JWST_NIRCam_for-Jan2025-from-JDocs/' +
-            'nircam_throughputs_Jan2025_v7/nircam_throughputs/mean_throughputs/')
+             'nircam_throughputs_Jan2025_v7/nircam_throughputs/mean_throughputs/')
     
     filts = ['F070W', 'F090W', 'F115W', 'F150W', 'F200W', 'F277W', 'F356W',
              'F410M', 'F444W']
@@ -401,8 +401,6 @@ def throughputs_jwst() :
 def throughputs_roman() :
     
     # https://roman.gsfc.nasa.gov/science/WFI_technical.html
-    
-    # https://vmromanweb1.ipac.caltech.edu/page/param-db
     
     inDir = 'passbands/passbands_Roman_for-27Mar2024-from-GSFC/'
     all_SCAs = np.full((18, 2200, 12), np.nan)
@@ -474,42 +472,5 @@ def throughputs_wise() :
         
         np.savetxt('passbands/passbands_micron/wise_{}.txt'.format(filt.lower()),
                    final, header='WAVELENGTH THROUGHPUT')
-    
-    return
-
-def save_castor_roman_throughput_plots() :
-    
-    import plotting as plt
-    
-    castor = ['castor_uv', 'castor_uvL', 'castor_uS', 'castor_u', 'castor_g']
-    # roman = ['roman_f062', 'roman_f087', 'roman_f106', 'roman_f129',
-    #          'roman_f146', 'roman_f158', 'roman_f184', 'roman_f213',]
-    roman = ['roman_f106', 'roman_f129', 'roman_f158', 'roman_f184']
-    
-    waves = []
-    trans = []
-    for filt in castor :
-        ww, tt = np.loadtxt('passbands/passbands_micron/{}.txt'.format(filt),
-                            unpack=True)
-        waves.append(ww)
-        trans.append(tt)
-    plt.plot_simple_multi(waves, trans, castor,
-        ['hotpink', 'violet', 'darkviolet', 'dodgerblue', 'cyan'],
-        ['']*5, ['-', '--', '-', '--', '-'], [1]*5, [], xlabel=r'Wavelength ($\mu$m)',
-        ylabel='Transmission', xmin=0.1, xmax=0.6, ymin=0, ymax=0.7,
-        save=True, outfile='figures/castor_filters.pdf')
-    
-    waves = []
-    trans = []
-    for filt in roman :
-        ww, tt = np.loadtxt('passbands/passbands_micron/{}.txt'.format(filt),
-                            unpack=True)
-        waves.append(ww)
-        trans.append(tt)
-    plt.plot_simple_multi(waves, trans, roman,
-        ['gold', 'darkorange', 'orangered', 'red'],
-        ['']*4, ['--', '-', '--', '-'], [1]*4, [], xlabel=r'Wavelength ($\mu$m)',
-        ylabel='Transmission', xmin=0.8, xmax=2.1, ymin=0, ymax=0.7,
-        save=True, outfile='figures/roman_filters.pdf')
     
     return
