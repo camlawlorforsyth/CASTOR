@@ -1275,7 +1275,7 @@ def plot_sfhs_comparison(xs, ys, time, data, centers,
     
     return
 
-def plot_simple_dumb(xs, ys, label='', save=False,
+def plot_simple_dumb(xs, ys, v1=np.nan, v2=np.nan, label='', save=False,
                      xlabel=None, ylabel=None, title=None, outfile=None,
                      xmin=None, xmax=None, ymin=None, ymax=None, loc=0,
                      figsizewidth=9.5, figsizeheight=7, scale='linear') :
@@ -1290,6 +1290,9 @@ def plot_simple_dumb(xs, ys, label='', save=False,
     # ax.plot(xx, xx, 'r-', label='equality')
     # ax.plot(xx, xx+0.18, 'b-', label='y = x + 0.18')
     ax.plot(xs, ys, 'ko', label=label, alpha=0.4)
+    
+    ax.axvline(v1, color='k')
+    ax.axvline(v2, color='r')
     
     ax.set_xscale(scale)
     ax.set_yscale(scale)
@@ -1313,7 +1316,8 @@ def plot_simple_dumb(xs, ys, label='', save=False,
     
     return
 
-def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas, textlabels,
+def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas, textlabels=None,
+                      v1=np.nan, v2=np.nan, v3=np.nan, v4=np.nan,
                       xlabel=None, ylabel=None, title=None,
                       xmin=None, xmax=None, ymin=None, ymax=None,
                       figsizewidth=9.5, figsizeheight=7, scale='linear', loc=0,
@@ -1336,17 +1340,31 @@ def plot_simple_multi(xs, ys, labels, colors, markers, styles, alphas, textlabel
     #         ax.text(xi, yi, lab, fontsize=10, ha='center', va='center',
     #                 alpha=alpha)
     
+    if not np.isnan(v1) :
+        ax.axvline(v1, color='k', label='TNG Rinner')
+    if not np.isnan(v2) :
+        ax.axvline(v2, color='r', label='TNG Router')
+    if not np.isnan(v3) :
+        ax.axvline(v3, color='lime', ls='--', label='FAST++ Rinner')
+    if not np.isnan(v4) :
+        ax.axvline(v4, color='m', ls='--', label='FAST++ Router')
+    
     ax.set_xscale(scale)
     ax.set_yscale(scale)
     
-    ax.set_title(title, fontsize=18)
-    ax.set_xlabel(xlabel, fontsize=15)
-    ax.set_ylabel(ylabel, fontsize=15)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    # if labels[0] != '' :
-    ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=15, loc=loc)
+    
+    # for saving filters plot
+    # ax.set_xticks([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.2, 1.5, 2, 2.5])
+    # ax.set_xticklabels(['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.8',
+    #                     '1', '1.2', '1.5', '2', '2.5'])
+    
+    ax.legend(facecolor='whitesmoke', framealpha=1, loc=loc, fontsize=9)
     
     plt.tight_layout()
     
@@ -1698,6 +1716,94 @@ def plot_simple_with_band(xs, ys, lo, med, hi, xlabel=None, ylabel=None,
     ax.set_ylim(ymin, ymax)
     if legend :
         ax.legend(facecolor='whitesmoke', framealpha=1, fontsize=18, loc=loc)
+    
+    plt.tight_layout()
+    
+    if save :
+        plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
+    else :
+        plt.show()
+    
+    return
+
+def side_by_side(xs1, ys1, xs2, ys2, xs3, ys3, titles=None, loc=0,
+                 xlabel1=None, ylabel1=None, xlabel2=None, ylabel2=None,
+                 xmin1=None, xmax1=None, xmin2=None, xmax2=None,
+                 ymin1=None, ymax1=None, ymin2=None, ymax2=None,
+                 figsizewidth=9.5, figsizeheight=7, save=False, outfile=None) :
+    
+    global currentFig
+    fig = plt.figure(currentFig, figsize=(figsizewidth, figsizeheight))
+    currentFig += 1
+    plt.clf()
+    
+    gs = fig.add_gridspec(1, 2, wspace=0)
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = ax2.twinx()
+    axins = ax1.inset_axes([0.7550413959285026, 0.4, 0.222, 0.265],
+                           xlim=(8.4, xmax1), ylim=(0, 0.06))
+    
+    ax2.yaxis.set_label_position('right')
+    ax2.yaxis.tick_right()
+    ax2.tick_params(left=False, labelleft=False)
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+    ax3.tick_params(right=False, labelright=False)
+    
+    labels = [r'$\log{(\tau)} = 9$, $R = 1$',
+              r'$\log{(\tau)} = 9.3$, $R = 0.001$',
+              r'$\log{(\tau)} = 9.3$, $R = 1$']
+    colors = ['k', 'b', 'k']
+    # markers = ['', '', '']
+    styles = ['-', '-', ':']
+    alphas = [1, 0.4, 1]
+    
+    for i in range(len(xs1)) :
+        ax1.plot(xs1[i], ys1[i], c=colors[i], ls=styles[i], alpha=alphas[i],
+                 label=labels[i])
+    
+    for i in range(len(xs1)) :
+        axins.plot(xs1[i], ys1[i], c=colors[i], ls=styles[i], alpha=alphas[i])
+    
+    for i in range(len(xs2)) :
+        ax2.plot(xs2[i], ys2[i], c=colors[i], ls=styles[i], alpha=alphas[i])
+    
+    colors = ['darkviolet', 'violet', 'dodgerblue', 'cyan', 'limegreen',
+              'yellow', 'gold', 'darkorange', 'orangered', 'red', 'darkred', 'grey']
+    styles = ['-', '--', '--', '-', '-', '--', '-', '-', '-', ':', '--', ':']
+    alphas = [1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0.8, 0.6, 0.8]
+    for i in range(len(xs3)) :
+        ax3.plot(xs3[i], ys3[i], c=colors[i], ls=styles[i], alpha=alphas[i])
+    
+    ax1.set_xlabel(xlabel1)
+    ax1.set_ylabel(ylabel1)
+    
+    ax2.set_xlabel(xlabel2)
+    ax2.set_ylabel(ylabel2)
+    
+    ax1.set_xlim(xmin1, xmax1)
+    ax2.set_xlim(xmin2, xmax2)
+    
+    ax1.set_ylim(ymin1, ymax1)
+    ax2.set_ylim(ymin2, ymax2)
+    ax3.set_ylim(0, 3)
+    
+    if titles :
+        ax1.set_title(titles[0], fontsize=10)
+        ax2.set_title(titles[1], fontsize=10)
+    
+    ax1.set_yticks([0, 0.1, 0.2, 0.3, 0.4])
+    
+    axins.set_xticks([8.4, 8.5, 8.6])
+    # axins.set_yticks([0, 0.05])
+    # axins.set_yticklabels(['0', '0.05'])
+    
+    ax2.set_xticks([0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 2.5])
+    ax2.set_xticklabels(['0.15', '0.2', '0.3', '0.5', '0.7', '1', '1.5', '2', '2.5'])
+    
+    ax1.legend(facecolor='whitesmoke', framealpha=1, loc=loc, fontsize=9.5)
     
     plt.tight_layout()
     
