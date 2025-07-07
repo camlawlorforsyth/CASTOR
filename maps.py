@@ -150,6 +150,12 @@ def create_map(image, uv_snr_image, hband_snr_image, highSNRpixels,
     # convert to physical maps from log images
     final_image = np.power(10, log_image)
     
+    # mask out extremely low-SNR pixels
+    if version == 'mass' :
+        final_image[hband_snr_image < 1] = 0.0
+    if version == 'sfr' :
+        final_image[uv_snr_image < 1] = 0.0
+    
     return final_image
 
 def conversion_factors_pixelbypixel(model_redshift=0.5) :
