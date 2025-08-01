@@ -25,7 +25,7 @@ def download_all_necessary_mpb_cutouts() :
     subIDs_to_download = []
     # missing_metallicities = 0
     for snap, subID in zip(unique_snaps, unique_subIDs) :
-        infile = 'S:/Cam/University/GitHub/TNG/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(
+        infile = 'S:/Cam/GitHub/TNG/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(
             snap, subID)
         with h5py.File(infile, 'r') as hf :
             if 'GFM_Metallicity' not in hf['PartType4'].keys() :
@@ -40,7 +40,7 @@ def download_all_necessary_mpb_cutouts() :
 
 def download_mpb_cutouts(snaps, subIDs) :
     
-    outDir = 'S:/Cam/University/GitHub/TNG/mpb_cutouts_099/'
+    outDir = 'S:/Cam/GitHub/TNG/mpb_cutouts_099/'
     
     # define the parameters that are requested for each particle in the cutout
     params = {'stars':'Coordinates,GFM_InitialMass,GFM_Metallicity,GFM_StellarFormationTime'}
@@ -124,7 +124,7 @@ def unique_galaxies_count() :
     missing_snaps = []
     missing_subIDs = []
     for snap, subID in zip(unique_snaps, unique_subIDs) :
-        file = 'S:/Cam/University/GitHub/TNG/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(
+        file = 'S:/Cam/GitHub/TNG/mpb_cutouts_099/cutout_{}_{}.hdf5'.format(
             snap, subID)
         if not exists(file) :
             missing_snaps.append(snap)

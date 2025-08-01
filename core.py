@@ -68,7 +68,7 @@ def get_particles(snap, subID, center) :
 def get_rotation_input(snap, subID) :
     
     # define the mpb cutouts file
-    inDir = 'S:/Cam/University/GitHub/TNG/mpb_cutouts_099/'
+    inDir = 'S:/Cam/GitHub/TNG/mpb_cutouts_099/'
     cutout_file = inDir + 'cutout_{}_{}.hdf5'.format(snap, subID)
     
     try :
